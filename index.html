@@ -765,6 +765,7 @@
         <label>Required Deadline <span class="required">*</span></label>
         <select id="deadline" onchange="updateQuotePreview()">
           <option value="">Select deadline...</option>
+          <option value="1day">Within 1 working day (+£150 surcharge)</option>
           <option value="3days">Within 3 working days (+£50 surcharge)</option>
           <option value="5days">Within 5 working days (standard rate)</option>
           <option value="10days">Within 10 working days / No urgency (standard rate)</option>
@@ -919,6 +920,7 @@ const BASE_PRICES = {
 };
 
 const SURCHARGES = {
+  '1day':  150,
   '3days': 50,
   '5days': 0,
   '10days': 0
@@ -936,10 +938,10 @@ const SURVEY_TYPE_LABELS = {
 };
 
 const DEADLINE_LABELS = {
+  '1day':   'Within 1 working day',
   '3days':  'Within 3 working days',
   '5days':  'Within 5 working days',
-  '10days': 'Within 10 working days / No urgency',
-  '1day':   'Within 1 working day'
+  '10days': 'Within 10 working days / No urgency'
 };
 
 // ============================================================
