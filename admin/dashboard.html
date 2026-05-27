@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THAC CRM — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/thac.css">
+</head>
+<body>
+<div class="app-layout" id="app"></div>
+
+<script src="js/supabase.js"></script>
+<script src="js/thac.js"></script>
+<script>
+requireAuth();
+
+// ============================================================
+// RENDER PAGE
+// ============================================================
+async function init() {
+  document.getElementById('app').innerHTML = `
+    ${renderSidebar('dashboard')}
+    <div class="main-content">
+      <div class="topbar">
+        <div class="topbar-title">Dashboard</div>
+        <div class="topbar-search">
+          <span>🔍</span>
+          <input type="text" placeholder="Search jobs, clients, enquiries..." id="globalSearch">
+        </div>
+        <span style="font-size:13px;color:var(--text-muted)">${new Date().toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long', year:'numeric'})}</span>
+      </div>
+      <div class="page-body">
+
+        <!-- Stat Cards -->
+        <div class="stat-grid" id="statGrid">
+          <div class="stat-card urgent">
+            <div class="stat-label">🔴 Urgent (1 day)</div>
+            <div class="stat-value" id="statUrgent">—</div>
+            <div class="stat-sub">Needs immediate action</div>
+          </div>
+          <div class="stat-card elevated">
+            <div class="stat-label">🟠 Elevated (3 days)</div>
+            <div class="stat-value" id="statElevated">—</div>
+            <div class="stat-sub">Action this week</div>
+          </div>
+          <div class="stat-card standard">
+            <div class="stat-label">🟡 Standard (5 days)</div>
+            <div class="stat-value" id="statStandard">—</div>
+            <div class="stat-sub">On track</div>
+          </div>
+          <div class="stat-card complete">
+            <div class="stat-label">✅ New Enquiries</div>
+            <div class="stat-value" id="statNew">—</div>
+            <div class="stat-sub">Awaiting review</div>
+          </div>
+        </div>
+
+        <!-- Two column layout -->
+        <div style="display:grid;grid-template-columns:1fr 380px;gap:20px;">
+
+          <!-- Urgency Dashboard -->
+          <div class="card">
+            <div class="card-title">
+              Urgency Dashboard
+              <a href="jobs.html" class="btn btn-secondary btn-sm">View All Jobs</a>
+            </div>
+            <div id="urgencyDashboard"><div class="loading"><div class="spinner"></div><br>Loading jobs...</div></div>
+          </div>
+
+          <!-- Recent Enquiries -->
+          <div class="card">
+            <div class="card-title">
+              Recent Enquiries
+              <a href="enquiries.html" class="btn btn-secondary btn-sm">View All</a>
+            </div>
+            <div id="recentEnquiries"><div class="loading"><div class="spinner"></div><br>Loading...</div></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  `;
+
+  await Promise.all([
+    loadStats(),
+    loadUrgencyDashboard(),
+    loadRecentEnquiries(),
+    loadEnquiryBadge()
+  ]);
+}
+
+// ============================================================
+// STATS
+// ============================================================
+async function loadStats() {
+  try {
+    const [urgent, elevated, standard, newEnquiries] = await Promise.all([
+      dbGet('enquiries', { 'deadline_tier': 'eq.1day', 'status': 'eq.new', 'select': 'id' }),
+      dbGet('enquiries', { 'deadline_tier': 'eq.3days', 'status': 'eq.new', 'select': 'id' }),
+      dbGet('enquiries', { 'deadline_tier': 'eq.5days', 'status': 'eq.new', 'select': 'id' }),
+      dbGet('enquiries', { 'status': 'eq.new', 'select': 'id' })
+    ]);
+
+    document.getElementById('statUrgent').textContent   = urgent?.length || 0;
+    document.getElementById('statElevated').textContent = elevated?.length || 0;
+    document.getElementById('statStandard').textContent = standard?.length || 0;
+    document.getElementById('statNew').textContent      = newEnquiries?.length || 0;
+  } catch (e) {
+    console.error('Stats error:', e);
+  }
+}
+
+// ============================================================
+// URGENCY DASHBOARD
+// ============================================================
+async function loadUrgencyDashboard() {
+  try {
+    const enquiries = await dbGet('enquiries', {
+      'select': 'id,job_number,contact_name,survey_type,site_postcode,deadline_tier,status,submitted_at',
+      'status': 'neq.spam',
+      'order': 'submitted_at.desc',
+      'limit': 25
+    });
+
+    if (!enquiries || enquiries.length === 0) {
+      document.getElementById('urgencyDashboard').innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <h3>No active jobs</h3>
+          <p>New enquiries will appear here</p>
+        </div>`;
+      return;
+    }
+
+    // Sort by urgency
+    const order = { '1day': 0, '3days': 1, '5days': 2, '10days': 3 };
+    enquiries.sort((a, b) => (order[a.deadline_tier] || 99) - (order[b.deadline_tier] || 99));
+
+    const rows = enquiries.map(e => `
+      <tr class="${getUrgencyRowClass(e.deadline_tier)}" onclick="window.location.href='enquiry-detail.html?id=${e.id}'" style="cursor:pointer">
+        <td>
+          <div class="ref">${e.job_number || 'Pending'}</div>
+          <div class="muted">${timeAgo(e.submitted_at)}</div>
+        </td>
+        <td>${e.contact_name || '—'}</td>
+        <td>${getSurveyLabel(e.survey_type)}</td>
+        <td>${e.site_postcode || '—'}</td>
+        <td>${urgencyBadge(e.deadline_tier)}</td>
+        <td>${statusBadge(e.status)}</td>
+      </tr>
+    `).join('');
+
+    document.getElementById('urgencyDashboard').innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Client</th>
+            <th>Survey Type</th>
+            <th>Postcode</th>
+            <th>Urgency</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  } catch (e) {
+    document.getElementById('urgencyDashboard').innerHTML = `<div class="empty-state"><p>Error loading jobs: ${e.message}</p></div>`;
+  }
+}
+
+// ============================================================
+// RECENT ENQUIRIES
+// ============================================================
+async function loadRecentEnquiries() {
+  try {
+    const enquiries = await dbGet('enquiries', {
+      'select': 'id,job_number,contact_name,survey_type,status,submitted_at',
+      'order': 'submitted_at.desc',
+      'limit': 8
+    });
+
+    if (!enquiries || enquiries.length === 0) {
+      document.getElementById('recentEnquiries').innerHTML = `<div class="empty-state"><p>No enquiries yet</p></div>`;
+      return;
+    }
+
+    const items = enquiries.map(e => `
+      <div onclick="window.location.href='enquiry-detail.html?id=${e.id}'" style="padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;" class="hover-row">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <span class="ref" style="font-size:12px;">${e.job_number || 'Pending'}</span>
+          ${statusBadge(e.status)}
+        </div>
+        <div style="font-size:13px;font-weight:500;color:var(--text);">${e.contact_name || '—'}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${getSurveyLabel(e.survey_type)} · ${timeAgo(e.submitted_at)}</div>
+      </div>
+    `).join('');
+
+    document.getElementById('recentEnquiries').innerHTML = `<div>${items}</div>`;
+  } catch (e) {
+    document.getElementById('recentEnquiries').innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+init();
+</script>
+</body>
+</html>

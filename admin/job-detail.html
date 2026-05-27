@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THAC CRM — Job Detail</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/thac.css">
+</head>
+<body>
+<div class="app-layout" id="app"></div>
+
+<script src="js/supabase.js"></script>
+<script src="js/thac.js"></script>
+<script>
+requireAuth();
+
+const params = new URLSearchParams(window.location.search);
+const jobId = params.get('id');
+let job = null;
+
+if (!jobId) window.location.href = 'jobs.html';
+
+async function init() {
+  document.getElementById('app').innerHTML = `
+    ${renderSidebar('jobs')}
+    <div class="main-content">
+      <div class="topbar">
+        <a href="jobs.html" class="btn btn-secondary btn-sm">← Back</a>
+        <div class="topbar-title" id="pageTitle">Job Detail</div>
+      </div>
+      <div class="page-body" id="pageBody">
+        <div class="loading"><div class="spinner"></div><br>Loading job...</div>
+      </div>
+    </div>
+  `;
+  await loadJob();
+  await loadEnquiryBadge();
+}
+
+async function loadJob() {
+  try {
+    const data = await dbGet('jobs', { 'id': `eq.${jobId}`, 'limit': 1 });
+    if (!data || data.length === 0) {
+      document.getElementById('pageBody').innerHTML = `<div class="empty-state"><h3>Job not found</h3></div>`;
+      return;
+    }
+    job = data[0];
+    document.getElementById('pageTitle').textContent = job.reference || 'Job Detail';
+    renderJob();
+  } catch (e) {
+    document.getElementById('pageBody').innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+function getDispatchBadge(state) {
+  const map = {
+    pending_approval: { label: '⏳ Pending Approval', cls: 'badge-low' },
+    red:    { label: '🔴 Unallocated', cls: 'badge-urgent' },
+    orange: { label: '🟠 Claimed',     cls: 'badge-elevated' },
+    yellow: { label: '🟡 Attended',    cls: 'badge-standard' },
+    green:  { label: '🟢 Report Sent', cls: 'badge-accepted' },
+    archived: { label: '📦 Archived', cls: 'badge-low' },
+  };
+  const s = map[state] || { label: state || '—', cls: 'badge-low' };
+  return `<span class="badge ${s.cls}">${s.label}</span>`;
+}
+
+function getUrgencyBadge(state) {
+  const map = {
+    red:    { label: '🔴 Urgent',   cls: 'badge-urgent' },
+    orange: { label: '🟠 Elevated', cls: 'badge-elevated' },
+    yellow: { label: '🟡 Standard', cls: 'badge-standard' },
+    grey:   { label: '⚫ Low',      cls: 'badge-low' },
+    green:  { label: '🟢 Complete', cls: 'badge-accepted' },
+  };
+  const s = map[state] || { label: state || '—', cls: 'badge-low' };
+  return `<span class="badge ${s.cls}">${s.label}</span>`;
+}
+
+function renderJob() {
+  document.getElementById('pageBody').innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="detail-ref">${job.reference || '—'}</div>
+        <div class="detail-sub">${getSurveyLabel(job.survey_type || job.job_type)}</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+        ${getUrgencyBadge(job.urgency_state)}
+        ${getDispatchBadge(job.dispatch_state)}
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;">
+      <div style="display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Site Details -->
+        <div class="card">
+          <div class="card-title">Site Details</div>
+          <div class="detail-grid">
+            <div class="detail-field">
+              <label>Site Postcode</label>
+              <div class="field-value">
+                <strong>${job.site_postcode || '—'}</strong>
+                ${job.site_postcode ? `<br><a href="https://maps.google.com/?q=${job.site_postcode}" target="_blank" style="font-size:12px;color:var(--green-mid);">View on Google Maps →</a>` : ''}
+              </div>
+            </div>
+            <div class="detail-field">
+              <label>Survey Type</label>
+              <div class="field-value">${getSurveyLabel(job.survey_type || job.job_type)}</div>
+            </div>
+            <div class="detail-field">
+              <label>Survey Date</label>
+              <div class="field-value">${formatDate(job.survey_date)}</div>
+            </div>
+            <div class="detail-field">
+              <label>SLA Deadline</label>
+              <div class="field-value">${formatDate(job.sla_deadline)}</div>
+            </div>
+            <div class="detail-field">
+              <label>Estimated Trees</label>
+              <div class="field-value">${job.estimated_tree_count || '—'}</div>
+            </div>
+            <div class="detail-field">
+              <label>Billing Mode</label>
+              <div class="field-value">${job.billing_mode ? job.billing_mode.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase()) : '—'}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Financial -->
+        <div class="card">
+          <div class="card-title">Financial</div>
+          <div class="detail-grid">
+            <div class="detail-field">
+              <label>Quoted Amount</label>
+              <div class="field-value">${job.quoted_amount ? '£' + Number(job.quoted_amount).toLocaleString() : '—'}</div>
+            </div>
+            <div class="detail-field">
+              <label>Agreed Amount</label>
+              <div class="field-value" style="font-size:20px;font-weight:700;color:var(--green-mid);">
+                ${job.agreed_amount ? '£' + Number(job.agreed_amount).toLocaleString() : '—'}
+              </div>
+            </div>
+            <div class="detail-field">
+              <label>Urgency Surcharge</label>
+              <div class="field-value">${job.urgency_surcharge ? '£' + Number(job.urgency_surcharge).toLocaleString() : '—'}</div>
+            </div>
+            <div class="detail-field">
+              <label>Surveyor Pay</label>
+              <div class="field-value">${job.surveyor_pay_amount ? '£' + Number(job.surveyor_pay_amount).toLocaleString() : '—'}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress Checklist -->
+        <div class="card">
+          <div class="card-title">Progress Checklist</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${[
+              ['Axiscape Prepared', job.axi_prepared, job.axi_prepared_at],
+              ['Report Drafted', job.report_drafted, job.report_drafted_at],
+              ['Field Data Uploaded', job.field_data_uploaded, job.field_data_uploaded_at],
+              ['Report Finalised', job.report_finalised, job.report_finalised_at],
+            ].map(([label, done, at]) => `
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+                <span style="font-size:18px;">${done ? '✅' : '⬜'}</span>
+                <span style="font-size:13px;font-weight:${done ? '500' : '400'};color:${done ? 'var(--green-dark)' : 'var(--text-muted)'};">${label}</span>
+                ${at ? `<span style="margin-left:auto;font-size:11px;color:var(--text-muted);">${formatDate(at)}</span>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        ${job.internal_notes ? `
+        <div class="card">
+          <div class="card-title">Internal Notes</div>
+          <div style="font-size:13px;line-height:1.6;background:var(--amber-light);padding:12px;border-radius:8px;">${job.internal_notes}</div>
+        </div>` : ''}
+
+      </div>
+
+      <!-- Right column -->
+      <div style="display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Update Urgency State -->
+        <div class="card">
+          <div class="card-title">Update Urgency</div>
+          <div class="form-group">
+            <label>Urgency State</label>
+            <select class="form-control" id="urgencySelect">
+              <option value="red"    ${job.urgency_state==='red'    ?'selected':''}>🔴 Urgent</option>
+              <option value="orange" ${job.urgency_state==='orange' ?'selected':''}>🟠 Elevated</option>
+              <option value="yellow" ${job.urgency_state==='yellow' ?'selected':''}>🟡 Standard</option>
+              <option value="grey"   ${job.urgency_state==='grey'   ?'selected':''}>⚫ Low</option>
+              <option value="green"  ${job.urgency_state==='green'  ?'selected':''}>🟢 Complete</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Dispatch State</label>
+            <select class="form-control" id="dispatchSelect">
+              <option value="pending_approval" ${job.dispatch_state==='pending_approval'?'selected':''}>⏳ Pending Approval</option>
+              <option value="red"    ${job.dispatch_state==='red'    ?'selected':''}>🔴 Unallocated</option>
+              <option value="orange" ${job.dispatch_state==='orange' ?'selected':''}>🟠 Claimed</option>
+              <option value="yellow" ${job.dispatch_state==='yellow' ?'selected':''}>🟡 Attended</option>
+              <option value="green"  ${job.dispatch_state==='green'  ?'selected':''}>🟢 Report Sent</option>
+              <option value="archived" ${job.dispatch_state==='archived'?'selected':''}>📦 Archived</option>
+            </select>
+          </div>
+          <button class="btn btn-primary w-100" onclick="updateStates()" style="justify-content:center;">Save</button>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+          <div class="card-title">Quick Actions</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="showToast('Surveyor dispatch coming in Sprint 3','warning')">
+              📍 Dispatch to Map
+            </button>
+            <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="showToast('Invoice tracking coming in Sprint 2','warning')">
+              🧾 Mark Invoiced
+            </button>
+          </div>
+        </div>
+
+        <!-- Record Info -->
+        <div class="card">
+          <div class="card-title">Record Info</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="detail-field">
+              <label>Reference</label>
+              <div class="field-value ref">${job.reference || '—'}</div>
+            </div>
+            <div class="detail-field">
+              <label>Created</label>
+              <div class="field-value">${formatDateTime(job.created_at)}</div>
+            </div>
+            <div class="detail-field">
+              <label>Two-Stage Job</label>
+              <div class="field-value">${job.is_two_stage ? 'Yes' : 'No'}</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+async function updateStates() {
+  const urgency_state = document.getElementById('urgencySelect').value;
+  const dispatch_state = document.getElementById('dispatchSelect').value;
+  try {
+    await dbUpdate('jobs', `id=eq.${jobId}`, { urgency_state, dispatch_state });
+    job.urgency_state = urgency_state;
+    job.dispatch_state = dispatch_state;
+    showToast('Job updated successfully');
+    renderJob();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+init();
+</script>
+</body>
+</html>

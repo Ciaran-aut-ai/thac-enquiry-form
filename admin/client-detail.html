@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THAC CRM — Client Detail</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/thac.css">
+</head>
+<body>
+<div class="app-layout" id="app"></div>
+
+<script src="js/supabase.js"></script>
+<script src="js/thac.js"></script>
+<script>
+requireAuth();
+
+const params = new URLSearchParams(window.location.search);
+const clientId = params.get('id');
+let client = null;
+
+if (!clientId) window.location.href = 'clients.html';
+
+async function init() {
+  document.getElementById('app').innerHTML = `
+    ${renderSidebar('clients')}
+    <div class="main-content">
+      <div class="topbar">
+        <a href="clients.html" class="btn btn-secondary btn-sm">← Back</a>
+        <div class="topbar-title" id="pageTitle">Client Detail</div>
+      </div>
+      <div class="page-body" id="pageBody">
+        <div class="loading"><div class="spinner"></div><br>Loading client...</div>
+      </div>
+    </div>
+  `;
+  await loadClient();
+  await loadEnquiryBadge();
+}
+
+async function loadClient() {
+  try {
+    const [clientData, jobsData] = await Promise.all([
+      dbGet('clients', { 'id': `eq.${clientId}`, 'limit': 1 }),
+      dbGet('jobs', { 
+        'arranging_client_id': `eq.${clientId}`, 
+        'select': 'id,reference,survey_type,urgency_state,dispatch_state,survey_date,agreed_amount', 
+        'order': 'created_at.desc' 
+      })
+    ]);
+
+    if (!clientData || clientData.length === 0) {
+      document.getElementById('pageBody').innerHTML = `<div class="empty-state"><h3>Client not found</h3></div>`;
+      return;
+    }
+
+    client = clientData[0];
+    const jobs = jobsData || [];
+    const name = client.company_name || client.full_name || '—';
+    document.getElementById('pageTitle').textContent = name;
+
+    const jobRows = jobs.length === 0
+      ? `<div class="empty-state" style="padding:24px"><p>No jobs for this client yet</p></div>`
+      : jobs.map(j => `
+        <tr onclick="window.location.href='job-detail.html?id=${j.id}'" style="cursor:pointer">
+          <td><div class="ref">${j.reference || '—'}</div></td>
+          <td>${getSurveyLabel(j.survey_type)}</td>
+          <td>${formatDate(j.survey_date)}</td>
+          <td>${j.agreed_amount ? '£' + Number(j.agreed_amount).toLocaleString() : '—'}</td>
+          <td>${statusBadge(j.dispatch_state)}</td>
+        </tr>`).join('');
+
+    document.getElementById('pageBody').innerHTML = `
+      <div class="detail-header">
+        <div>
+          <div class="detail-ref">${name}</div>
+          <div class="detail-sub">${client.client_type || ''} ${client.client_category ? '· ' + client.client_category : ''}</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;">
+        <div style="display:flex;flex-direction:column;gap:20px;">
+
+          <div class="card">
+            <div class="card-title">Contact Details</div>
+            <div class="detail-grid">
+              <div class="detail-field">
+                <label>Full Name</label>
+                <div class="field-value">${client.full_name || '—'}</div>
+              </div>
+              <div class="detail-field">
+                <label>Company</label>
+                <div class="field-value">${client.company_name || '—'}</div>
+              </div>
+              <div class="detail-field">
+                <label>Email</label>
+                <div class="field-value">
+                  ${client.email ? `<a href="mailto:${client.email}">${client.email}</a>` : '—'}
+                </div>
+              </div>
+              <div class="detail-field">
+                <label>Phone</label>
+                <div class="field-value">
+                  ${client.phone ? `<a href="tel:${client.phone}">${client.phone}</a>` : '—'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Address</div>
+            <div class="detail-grid">
+              <div class="detail-field" style="grid-column:1/-1">
+                <label>Address</label>
+                <div class="field-value">
+                  ${[client.address_line_1, client.address_line_2].filter(Boolean).join(', ') || '—'}
+                </div>
+              </div>
+              <div class="detail-field">
+                <label>City</label>
+                <div class="field-value">${client.address_city || '—'}</div>
+              </div>
+              <div class="detail-field">
+                <label>County</label>
+                <div class="field-value">${client.address_county || '—'}</div>
+              </div>
+              <div class="detail-field">
+                <label>Postcode</label>
+                <div class="field-value">${client.address_postcode || '—'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Jobs (${jobs.length})</div>
+            ${jobs.length > 0 ? `
+            <table class="data-table">
+              <thead><tr><th>Ref</th><th>Type</th><th>Survey Date</th><th>Value</th><th>Status</th></tr></thead>
+              <tbody>${jobRows}</tbody>
+            </table>` : `<div class="empty-state" style="padding:24px"><p>No jobs yet</p></div>`}
+          </div>
+
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:20px;">
+          <div class="card">
+            <div class="card-title">Quick Actions</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${client.email ? `<a href="mailto:${client.email}" class="btn btn-secondary w-100" style="justify-content:center;">📧 Email Client</a>` : ''}
+              ${client.phone ? `<a href="tel:${client.phone}" class="btn btn-secondary w-100" style="justify-content:center;">📞 Call Client</a>` : ''}
+            </div>
+          </div>
+
+          ${client.notes ? `
+          <div class="card">
+            <div class="card-title">Notes</div>
+            <div style="font-size:13px;line-height:1.6;">${client.notes}</div>
+          </div>` : ''}
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    document.getElementById('pageBody').innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+init();
+</script>
+</body>
+</html>

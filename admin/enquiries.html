@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THAC CRM — Enquiries</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/thac.css">
+</head>
+<body>
+<div class="app-layout" id="app"></div>
+
+<script src="js/supabase.js"></script>
+<script src="js/thac.js"></script>
+<script>
+requireAuth();
+
+let allEnquiries = [];
+let activeFilter = 'all';
+let searchQuery = '';
+
+async function init() {
+  document.getElementById('app').innerHTML = `
+    ${renderSidebar('enquiries')}
+    <div class="main-content">
+      <div class="topbar">
+        <div class="topbar-title">Enquiries</div>
+        <div class="topbar-search">
+          <span>🔍</span>
+          <input type="text" placeholder="Search by name, reference, postcode..." id="searchInput" oninput="handleSearch(this.value)">
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="card">
+          <div class="card-title">
+            All Enquiries
+            <span style="font-size:13px;font-weight:400;color:var(--text-muted)" id="enquiryCount"></span>
+          </div>
+
+          <div class="filter-bar">
+            <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+            <button class="filter-btn" onclick="setFilter('new', this)">🔵 New</button>
+            <button class="filter-btn" onclick="setFilter('reviewed', this)">Reviewed</button>
+            <button class="filter-btn" onclick="setFilter('quoted', this)">Quoted</button>
+            <button class="filter-btn" onclick="setFilter('accepted', this)">✅ Accepted</button>
+            <button class="filter-btn" onclick="setFilter('declined', this)">❌ Declined</button>
+            <button class="filter-btn" onclick="setFilter('spam', this)">🚫 Spam</button>
+            <div style="margin-left:auto;display:flex;gap:8px;">
+              <select class="form-control" style="width:auto;padding:6px 28px 6px 10px;font-size:12px;" onchange="setSortOrder(this.value)">
+                <option value="submitted_at.desc">Newest First</option>
+                <option value="submitted_at.asc">Oldest First</option>
+                <option value="deadline_tier.asc">Urgency</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="enquiriesTable"><div class="loading"><div class="spinner"></div><br>Loading enquiries...</div></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  await loadEnquiries();
+  await loadEnquiryBadge();
+}
+
+async function loadEnquiries(order = 'submitted_at.desc') {
+  try {
+    const data = await dbGet('enquiries', {
+      'select': 'id,job_number,enquiry_type,contact_name,contact_email,contact_phone,survey_type,site_postcode,deadline_tier,status,submitted_at,company',
+      'order': order
+    });
+
+    allEnquiries = data || [];
+    renderTable();
+  } catch (e) {
+    document.getElementById('enquiriesTable').innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+function renderTable() {
+  let filtered = allEnquiries;
+
+  if (activeFilter !== 'all') {
+    filtered = filtered.filter(e => e.status === activeFilter);
+  }
+
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    filtered = filtered.filter(e =>
+      (e.contact_name || '').toLowerCase().includes(q) ||
+      (e.job_number || '').toLowerCase().includes(q) ||
+      (e.site_postcode || '').toLowerCase().includes(q) ||
+      (e.contact_email || '').toLowerCase().includes(q) ||
+      (e.company || '').toLowerCase().includes(q)
+    );
+  }
+
+  document.getElementById('enquiryCount').textContent = `${filtered.length} record${filtered.length !== 1 ? 's' : ''}`;
+
+  if (filtered.length === 0) {
+    document.getElementById('enquiriesTable').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📥</div>
+        <h3>No enquiries found</h3>
+        <p>Try adjusting your search or filter</p>
+      </div>`;
+    return;
+  }
+
+  const rows = filtered.map(e => `
+    <tr class="${getUrgencyRowClass(e.deadline_tier)}" onclick="window.location.href='enquiry-detail.html?id=${e.id}'" style="cursor:pointer">
+      <td>
+        <div class="ref">${e.job_number || 'Pending'}</div>
+        <div class="muted">${e.enquiry_type === 'amendment' ? '📋 Amendment' : '🆕 New'}</div>
+      </td>
+      <td>
+        <div style="font-weight:500">${e.contact_name || '—'}</div>
+        <div class="muted">${e.company || e.contact_email || ''}</div>
+      </td>
+      <td>${getSurveyLabel(e.survey_type)}</td>
+      <td>${e.site_postcode || '—'}</td>
+      <td>${urgencyBadge(e.deadline_tier)}</td>
+      <td>${statusBadge(e.status)}</td>
+      <td class="muted">${timeAgo(e.submitted_at)}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('enquiriesTable').innerHTML = `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Reference</th>
+          <th>Client</th>
+          <th>Survey Type</th>
+          <th>Postcode</th>
+          <th>Urgency</th>
+          <th>Status</th>
+          <th>Received</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function setFilter(filter, btn) {
+  activeFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable();
+}
+
+function handleSearch(q) {
+  searchQuery = q;
+  renderTable();
+}
+
+function setSortOrder(order) {
+  loadEnquiries(order);
+}
+
+init();
+</script>
+</body>
+</html>

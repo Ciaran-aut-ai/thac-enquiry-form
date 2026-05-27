@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THAC CRM — Enquiry Detail</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/thac.css">
+<style>
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal {
+  background: white; border-radius: 16px; padding: 32px;
+  width: 100%; max-width: 560px;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.modal-title {
+  font-size: 18px; font-weight: 700; color: var(--green-dark);
+  margin-bottom: 6px;
+}
+.modal-sub {
+  font-size: 13px; color: var(--text-muted); margin-bottom: 24px;
+}
+.modal-footer {
+  display: flex; gap: 10px; margin-top: 24px;
+}
+</style>
+</head>
+<body>
+<div class="app-layout" id="app"></div>
+
+<!-- Convert to Job Modal -->
+<div class="modal-overlay" id="convertModal" style="display:none">
+  <div class="modal">
+    <div class="modal-title">Convert to Job</div>
+    <div class="modal-sub">Review the details below before creating the job record.</div>
+
+    <div class="form-group">
+      <label>Client Full Name <span class="req">*</span></label>
+      <input type="text" class="form-control" id="cvtName">
+    </div>
+    <div class="form-group">
+      <label>Client Email <span class="req">*</span></label>
+      <input type="email" class="form-control" id="cvtEmail">
+    </div>
+    <div class="form-group">
+      <label>Client Phone</label>
+      <input type="tel" class="form-control" id="cvtPhone">
+    </div>
+    <div class="form-group">
+      <label>Company / Organisation</label>
+      <input type="text" class="form-control" id="cvtCompany">
+    </div>
+    <div class="form-group">
+      <label>Site Postcode <span class="req">*</span></label>
+      <input type="text" class="form-control" id="cvtPostcode" style="text-transform:uppercase">
+    </div>
+    <div class="form-group">
+      <label>Survey Type</label>
+      <select class="form-control" id="cvtSurveyType">
+        <option value="bs5837">BS5837 Tree Survey (Planning)</option>
+        <option value="vta">Visual Tree Assessment (VTA)</option>
+        <option value="bc">BS5837 Stage 2 (AIA/AMS/TPP)</option>
+        <option value="subs">Subsidence / Building Damage</option>
+        <option value="ams">Arboricultural Method Statement</option>
+        <option value="tpp">Tree Protection Plan</option>
+        <option value="tpo">TPO Application</option>
+        <option value="lscp">Landscaping Plans</option>
+        <option value="mortgage">Mortgage / Insurer Report</option>
+        <option value="supervision">Site Supervision</option>
+        <option value="amendment">Amendment</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Urgency State</label>
+      <select class="form-control" id="cvtUrgency">
+        <option value="red">🔴 Urgent (1 day)</option>
+        <option value="orange">🟠 Elevated (3 days)</option>
+        <option value="yellow" selected>🟡 Standard (5 days)</option>
+        <option value="grey">⚫ Low (10+ days)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Quoted Amount (£ excl VAT)</label>
+      <input type="number" class="form-control" id="cvtAmount" placeholder="e.g. 350">
+    </div>
+    <div class="form-group">
+      <label>Billing Mode</label>
+      <select class="form-control" id="cvtBilling">
+        <option value="single">Single Invoice (default)</option>
+        <option value="staged">Staged 50/50</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Internal Notes</label>
+      <textarea class="form-control" id="cvtNotes" placeholder="Any internal notes for this job..."></textarea>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()" style="flex:1;justify-content:center;">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmConvert()" style="flex:2;justify-content:center;" id="cvtBtn">
+        ✓ Create Job
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="js/supabase.js"></script>
+<script src="js/thac.js"></script>
+<script>
+requireAuth();
+
+const params = new URLSearchParams(window.location.search);
+const enquiryId = params.get('id');
+let enquiry = null;
+
+if (!enquiryId) window.location.href = 'enquiries.html';
+
+async function init() {
+  document.getElementById('app').innerHTML = `
+    ${renderSidebar('enquiries')}
+    <div class="main-content">
+      <div class="topbar">
+        <a href="enquiries.html" class="btn btn-secondary btn-sm">← Back</a>
+        <div class="topbar-title" id="pageTitle">Enquiry Detail</div>
+      </div>
+      <div class="page-body" id="pageBody">
+        <div class="loading"><div class="spinner"></div><br>Loading enquiry...</div>
+      </div>
+    </div>
+  `;
+  await loadEnquiry();
+  await loadEnquiryBadge();
+}
+
+async function loadEnquiry() {
+  try {
+    const data = await dbGet('enquiries', { 'id': `eq.${enquiryId}`, 'limit': 1 });
+    if (!data || data.length === 0) {
+      document.getElementById('pageBody').innerHTML = `<div class="empty-state"><h3>Enquiry not found</h3></div>`;
+      return;
+    }
+    enquiry = data[0];
+    document.getElementById('pageTitle').textContent = enquiry.job_number || 'Enquiry Detail';
+    renderEnquiry();
+  } catch (e) {
+    document.getElementById('pageBody').innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+function renderEnquiry() {
+  const isAmendment = enquiry.enquiry_type === 'amendment';
+  const isAccepted = enquiry.status === 'accepted';
+
+  document.getElementById('pageBody').innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="detail-ref">${enquiry.job_number || 'Pending Reference'}</div>
+        <div class="detail-sub">
+          ${isAmendment ? '📋 Amendment' : '🆕 New Survey'} ·
+          Received ${formatDateTime(enquiry.submitted_at)}
+        </div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:10px;align-items:center;">
+        ${urgencyBadge(enquiry.deadline_tier)}
+        ${statusBadge(enquiry.status)}
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;">
+      <div style="display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Contact Details -->
+        <div class="card">
+          <div class="card-title">Contact Details</div>
+          <div class="detail-grid">
+            <div class="detail-field">
+              <label>Full Name</label>
+              <div class="field-value">${enquiry.contact_name || '—'}</div>
+            </div>
+            <div class="detail-field">
+              <label>Company</label>
+              <div class="field-value">${enquiry.company || '—'}</div>
+            </div>
+            <div class="detail-field">
+              <label>Email</label>
+              <div class="field-value">
+                <a href="mailto:${enquiry.contact_email}">${enquiry.contact_email || '—'}</a>
+              </div>
+            </div>
+            <div class="detail-field">
+              <label>Phone</label>
+              <div class="field-value">
+                ${enquiry.contact_phone ? `<a href="tel:${enquiry.contact_phone}">${enquiry.contact_phone}</a>` : '—'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        ${isAmendment ? `
+        <div class="card">
+          <div class="card-title">Amendment Details</div>
+          <div class="detail-grid">
+            <div class="detail-field">
+              <label>Original Job Reference</label>
+              <div class="field-value ref">${enquiry.original_job_ref || '—'}</div>
+            </div>
+            <div class="detail-field">
+              <label>Deadline</label>
+              <div class="field-value">${getDeadlineLabel(enquiry.deadline_tier)}</div>
+            </div>
+          </div>
+          <div class="detail-field" style="margin-top:12px;">
+            <label>Scope of Amendment</label>
+            <div class="field-value" style="background:var(--bg);padding:12px;border-radius:8px;margin-top:6px;line-height:1.6;">
+              ${enquiry.amendment_scope || '—'}
+            </div>
+          </div>
+        </div>
+        ` : `
+        <div class="card">
+          <div class="card-title">Survey Details</div>
+          <div class="detail-grid">
+            <div class="detail-field">
+              <label>Survey Type</label>
+              <div class="field-value">${getSurveyLabel(enquiry.survey_type)}</div>
+            </div>
+            <div class="detail-field">
+              <label>Tree Count Band</label>
+              <div class="field-value">${enquiry.tree_count_band ? enquiry.tree_count_band + ' trees' : '—'}</div>
+            </div>
+            <div class="detail-field">
+              <label>Site Postcode</label>
+              <div class="field-value">
+                <strong>${enquiry.site_postcode || '—'}</strong>
+                ${enquiry.site_postcode ? `<br><a href="https://maps.google.com/?q=${enquiry.site_postcode}" target="_blank" style="font-size:12px;color:var(--green-mid);">View on Google Maps →</a>` : ''}
+              </div>
+            </div>
+            <div class="detail-field">
+              <label>Required Deadline</label>
+              <div class="field-value">${getDeadlineLabel(enquiry.deadline_tier)}</div>
+            </div>
+          </div>
+        </div>
+        `}
+
+      </div>
+
+      <!-- Right column -->
+      <div style="display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Update Status -->
+        <div class="card">
+          <div class="card-title">Update Status</div>
+          <div class="form-group">
+            <label>Current Status</label>
+            <select class="form-control" id="statusSelect">
+              <option value="new"      ${enquiry.status==='new'      ?'selected':''}>New</option>
+              <option value="reviewed" ${enquiry.status==='reviewed' ?'selected':''}>Reviewed</option>
+              <option value="quoted"   ${enquiry.status==='quoted'   ?'selected':''}>Quoted</option>
+              <option value="accepted" ${enquiry.status==='accepted' ?'selected':''}>Accepted</option>
+              <option value="declined" ${enquiry.status==='declined' ?'selected':''}>Declined</option>
+              <option value="spam"     ${enquiry.status==='spam'     ?'selected':''}>Spam</option>
+            </select>
+          </div>
+          <button class="btn btn-primary w-100" onclick="updateStatus()" style="justify-content:center;">
+            Save Status
+          </button>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+          <div class="card-title">Quick Actions</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <a href="mailto:${enquiry.contact_email}?subject=Re: Your Tree Survey Enquiry ${enquiry.job_number || ''}" class="btn btn-secondary w-100" style="justify-content:center;">
+              📧 Email Client
+            </a>
+            ${enquiry.contact_phone ? `
+            <a href="tel:${enquiry.contact_phone}" class="btn btn-secondary w-100" style="justify-content:center;">
+              📞 Call Client
+            </a>` : ''}
+            ${!isAccepted ? `
+            <button class="btn btn-primary w-100" onclick="openConvertModal()" style="justify-content:center;background:var(--green-dark);">
+              💼 Convert to Job
+            </button>` : `
+            <div style="text-align:center;font-size:13px;color:var(--green-mid);font-weight:500;padding:8px;">
+              ✅ Converted to Job
+            </div>`}
+          </div>
+        </div>
+
+        <!-- Record Info -->
+        <div class="card">
+          <div class="card-title">Record Info</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="detail-field">
+              <label>Reference</label>
+              <div class="field-value ref">${enquiry.job_number || 'Pending'}</div>
+            </div>
+            <div class="detail-field">
+              <label>Submitted</label>
+              <div class="field-value">${formatDateTime(enquiry.submitted_at)}</div>
+            </div>
+            <div class="detail-field">
+              <label>Type</label>
+              <div class="field-value">${enquiry.enquiry_type === 'amendment' ? 'Amendment' : 'New Survey'}</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+async function updateStatus() {
+  const newStatus = document.getElementById('statusSelect').value;
+  try {
+    await dbUpdate('enquiries', `id=eq.${enquiryId}`, { status: newStatus });
+    enquiry.status = newStatus;
+    showToast('Status updated successfully');
+    renderEnquiry();
+  } catch (e) {
+    showToast('Error updating status: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// CONVERT TO JOB
+// ============================================================
+function openConvertModal() {
+  // Pre-fill from enquiry data
+  document.getElementById('cvtName').value = enquiry.contact_name || '';
+  document.getElementById('cvtEmail').value = enquiry.contact_email || '';
+  document.getElementById('cvtPhone').value = enquiry.contact_phone || '';
+  document.getElementById('cvtCompany').value = enquiry.company || '';
+  document.getElementById('cvtPostcode').value = enquiry.site_postcode || '';
+
+  // Set survey type
+  const st = document.getElementById('cvtSurveyType');
+  if (enquiry.survey_type) {
+    for (let opt of st.options) {
+      if (opt.value === enquiry.survey_type) { opt.selected = true; break; }
+    }
+  }
+
+  // Set urgency from deadline tier
+  const urgMap = { '1day': 'red', '3days': 'orange', '5days': 'yellow', '10days': 'grey' };
+  const urg = document.getElementById('cvtUrgency');
+  const urgVal = urgMap[enquiry.deadline_tier] || 'standard';
+  for (let opt of urg.options) {
+    if (opt.value === urgVal) { opt.selected = true; break; }
+  }
+
+  document.getElementById('convertModal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('convertModal').style.display = 'none';
+}
+
+async function confirmConvert() {
+  const name = document.getElementById('cvtName').value.trim();
+  const email = document.getElementById('cvtEmail').value.trim();
+  const postcode = document.getElementById('cvtPostcode').value.trim().toUpperCase();
+
+  if (!name || !email || !postcode) {
+    showToast('Name, email and postcode are required', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('cvtBtn');
+  btn.textContent = 'Creating...';
+  btn.disabled = true;
+
+  try {
+    // Step 1 — Create client record
+    const companyName = document.getElementById('cvtCompany').value.trim();
+    const clientData = await dbInsert('clients', {
+      full_name: name,
+      company_name: companyName || name,
+      email: email,
+      phone: document.getElementById('cvtPhone').value.trim() || null,
+      address_postcode: postcode,
+      client_type: companyName ? 'company' : 'individual',
+    });
+
+    const clientId = clientData[0].id;
+
+    // Step 2 — Create job record
+    const amount = document.getElementById('cvtAmount').value;
+    const jobData = await dbInsert('jobs', {
+      survey_type: document.getElementById('cvtSurveyType').value,
+      site_postcode: postcode,
+      urgency_state: document.getElementById('cvtUrgency').value,
+      job_type: 'new',
+      dispatch_state: 'pending_approval',
+      billing_mode: document.getElementById('cvtBilling').value,
+      quoted_amount: amount ? parseFloat(amount) : null,
+      agreed_amount: amount ? parseFloat(amount) : null,
+      arranging_client_id: clientId,
+      internal_notes: document.getElementById('cvtNotes').value.trim() || null,
+    });
+
+    const jobId = jobData[0].id;
+
+    // Step 3 — Update enquiry status to accepted
+    await dbUpdate('enquiries', `id=eq.${enquiryId}`, { status: 'accepted' });
+
+    closeModal();
+    showToast('Job created successfully! Redirecting...');
+
+    setTimeout(() => {
+      window.location.href = `job-detail.html?id=${jobId}`;
+    }, 1500);
+
+  } catch (e) {
+    showToast('Error creating job: ' + e.message, 'error');
+    btn.textContent = '✓ Create Job';
+    btn.disabled = false;
+  }
+}
+
+init();
+</script>
+</body>
+</html>
+<-- v2 -->

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THAC CRM — Clients</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/thac.css">
+</head>
+<body>
+<div class="app-layout" id="app"></div>
+
+<script src="js/supabase.js"></script>
+<script src="js/thac.js"></script>
+<script>
+requireAuth();
+
+let allClients = [];
+let activeFilter = 'all';
+let searchQuery = '';
+
+async function init() {
+  document.getElementById('app').innerHTML = `
+    ${renderSidebar('clients')}
+    <div class="main-content">
+      <div class="topbar">
+        <div class="topbar-title">Clients</div>
+        <div class="topbar-search">
+          <span>🔍</span>
+          <input type="text" placeholder="Search by name, email, company..." oninput="handleSearch(this.value)">
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="card">
+          <div class="card-title">
+            All Clients
+            <span style="font-size:13px;font-weight:400;color:var(--text-muted)" id="clientCount"></span>
+          </div>
+          <div class="filter-bar">
+            <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+            <button class="filter-btn" onclick="setFilter('individual', this)">Individual</button>
+            <button class="filter-btn" onclick="setFilter('company', this)">Company</button>
+            <button class="filter-btn" onclick="setFilter('agent', this)">Agent</button>
+            <button class="filter-btn" onclick="setFilter('developer', this)">Developer</button>
+          </div>
+          <div id="clientsTable"><div class="loading"><div class="spinner"></div><br>Loading clients...</div></div>
+        </div>
+      </div>
+    </div>
+  `;
+  await loadClients();
+  await loadEnquiryBadge();
+}
+
+async function loadClients() {
+  try {
+    const data = await dbGet('clients', {
+      'select': 'id,client_type,client_category,full_name,company_name,email,phone,address_city,address_county,created_at',
+      'order': 'created_at.desc',
+      'limit': 200
+    });
+    allClients = data || [];
+    renderTable();
+  } catch (e) {
+    document.getElementById('clientsTable').innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+function getClientName(c) {
+  return c.company_name || c.full_name || '—';
+}
+
+function renderTable() {
+  let filtered = allClients;
+
+  if (activeFilter !== 'all') {
+    filtered = filtered.filter(c => c.client_type === activeFilter);
+  }
+
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    filtered = filtered.filter(c =>
+      getClientName(c).toLowerCase().includes(q) ||
+      (c.email || '').toLowerCase().includes(q) ||
+      (c.phone || '').includes(q)
+    );
+  }
+
+  document.getElementById('clientCount').textContent = `${filtered.length} record${filtered.length !== 1 ? 's' : ''}`;
+
+  if (filtered.length === 0) {
+    document.getElementById('clientsTable').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">👥</div>
+        <h3>No clients found</h3>
+        <p>Clients are created when jobs are approved</p>
+      </div>`;
+    return;
+  }
+
+  const rows = filtered.map(c => `
+    <tr onclick="window.location.href='client-detail.html?id=${c.id}'" style="cursor:pointer">
+      <td>
+        <div style="font-weight:500">${getClientName(c)}</div>
+        <div class="muted">${c.client_type || ''}</div>
+      </td>
+      <td>${c.email ? `<a href="mailto:${c.email}" onclick="event.stopPropagation()">${c.email}</a>` : '—'}</td>
+      <td>${c.phone ? `<a href="tel:${c.phone}" onclick="event.stopPropagation()">${c.phone}</a>` : '—'}</td>
+      <td>${[c.address_city, c.address_county].filter(Boolean).join(', ') || '—'}</td>
+      <td><span class="badge badge-accepted">${c.client_category || c.client_type || '—'}</span></td>
+    </tr>
+  `).join('');
+
+  document.getElementById('clientsTable').innerHTML = `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Location</th>
+          <th>Type</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function setFilter(filter, btn) {
+  activeFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable();
+}
+
+function handleSearch(q) {
+  searchQuery = q;
+  renderTable();
+}
+
+init();
+</script>
+</body>
+</html>
