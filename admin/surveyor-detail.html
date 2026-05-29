@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THAC CRM — Surveyor Detail</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/thac.css">
+</head>
+<body>
+<div class="app-layout" id="app"></div>
+
+<script src="js/supabase.js"></script>
+<script src="js/thac.js"></script>
+<script>
+requireAuth();
+
+const params     = new URLSearchParams(window.location.search);
+const surveyorId = params.get('id');
+const isNew      = params.get('new') === '1';
+let surveyor     = null;
+let surveyorJobs = [];
+
+if (!surveyorId && !isNew) window.location.href = 'surveyors.html';
+
+async function init() {
+  document.getElementById('app').innerHTML = `
+    ${renderSidebar('surveyors')}
+    <div class="main-content">
+      <div class="topbar">
+        <a href="surveyors.html" class="btn btn-secondary btn-sm">← Back</a>
+        <div class="topbar-title" id="pageTitle">${isNew ? 'New Surveyor' : 'Surveyor Detail'}</div>
+      </div>
+      <div class="page-body" id="pageBody">
+        <div class="loading"><div class="spinner"></div><br>Loading...</div>
+      </div>
+    </div>
+  `;
+
+  if (isNew) {
+    surveyor = {};
+    renderEdit();
+  } else {
+    await loadSurveyor();
+  }
+  await loadEnquiryBadge();
+}
+
+async function loadSurveyor() {
+  try {
+    const [sData, jData] = await Promise.all([
+      dbGet('surveyors', { 'id': `eq.${surveyorId}`, 'limit': 1 }),
+      dbGet('jobs', {
+        'surveyor_id': `eq.${surveyorId}`,
+        'select': 'id,reference,survey_type,urgency_state,dispatch_state,survey_date,agreed_amount,surveyor_pay_amount',
+        'order': 'created_at.desc',
+        'limit': 20
+      })
+    ]);
+
+    if (!sData || sData.length === 0) {
+      document.getElementById('pageBody').innerHTML = `<div class="empty-state"><h3>Surveyor not found</h3></div>`;
+      return;
+    }
+
+    surveyor     = sData[0];
+    surveyorJobs = jData || [];
+    document.getElementById('pageTitle').textContent = surveyor.full_name || 'Surveyor Detail';
+    renderView();
+  } catch (e) {
+    document.getElementById('pageBody').innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function expiryStatus(dateStr) {
+  if (!dateStr) return { cls: 'badge-low', label: '— Not set', detail: '' };
+  const days = Math.floor((new Date(dateStr) - Date.now()) / (1000 * 60 * 60 * 24));
+  if (days < 0)   return { cls: 'badge-urgent',   label: '🔴 Expired',       detail: `Expired ${Math.abs(days)}d ago` };
+  if (days <= 30) return { cls: 'badge-elevated', label: `🟠 ${days}d left`,  detail: `Expires ${formatDate(dateStr)}` };
+  return             { cls: 'badge-accepted', label: '🟢 Valid',            detail: `Expires ${formatDate(dateStr)}` };
+}
+
+function insuranceRow(label, policyNum, expiryDate) {
+  const s = expiryStatus(expiryDate);
+  return `
+    <div class="detail-field">
+      <label>${label}</label>
+      <div class="field-value">
+        <span class="badge ${s.cls}">${s.label}</span>
+        ${policyNum ? `<div style="font-size:12px;margin-top:4px;color:var(--text-muted);">Policy: ${policyNum}</div>` : ''}
+        ${s.detail   ? `<div style="font-size:12px;color:var(--text-muted);">${s.detail}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// VIEW MODE
+// ============================================================
+
+function renderView() {
+  const activeLabel = surveyor.is_active
+    ? `<span class="badge badge-accepted">✅ Active</span>`
+    : `<span class="badge badge-low">⏸ Paused</span>`;
+
+  const jobRows = surveyorJobs.length === 0
+    ? ''
+    : surveyorJobs.map(j => `
+        <tr onclick="window.location.href='job-detail.html?id=${j.id}'" style="cursor:pointer">
+          <td><div class="ref">${j.reference || '—'}</div></td>
+          <td>${getSurveyLabel(j.survey_type)}</td>
+          <td>${formatDate(j.survey_date)}</td>
+          <td>${j.agreed_amount ? '£' + Number(j.agreed_amount).toLocaleString() : '—'}</td>
+          <td>${j.surveyor_pay_amount ? '£' + Number(j.surveyor_pay_amount).toLocaleString() : '—'}</td>
+          <td>${statusBadge(j.dispatch_state)}</td>
+        </tr>`).join('');
+
+  document.getElementById('pageBody').innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="detail-ref">${surveyor.full_name || '—'}</div>
+        <div class="detail-sub">${surveyor.email || ''}</div>
+      </div>
+      <div style="margin-left:auto;">${activeLabel}</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;">
+      <div style="display:flex;flex-direction:column;gap:20px;">
+
+        <div class="card">
+          <div class="card-title">Contact & Rates</div>
+          <div class="detail-grid">
+            <div class="detail-field">
+              <label>Full Name</label>
+              <div class="field-value">${surveyor.full_name || '—'}</div>
+            </div>
+            <div class="detail-field">
+              <label>Email</label>
+              <div class="field-value">${surveyor.email ? `<a href="mailto:${surveyor.email}">${surveyor.email}</a>` : '—'}</div>
+            </div>
+            <div class="detail-field">
+              <label>Phone</label>
+              <div class="field-value">${surveyor.phone ? `<a href="tel:${surveyor.phone}">${surveyor.phone}</a>` : '—'}</div>
+            </div>
+            <div class="detail-field">
+              <label>Hourly Rate</label>
+              <div class="field-value" style="font-size:18px;font-weight:700;color:var(--green-mid);">
+                ${surveyor.hourly_rate ? '£' + Number(surveyor.hourly_rate).toFixed(2) + '/hr' : '—'}
+              </div>
+            </div>
+            <div class="detail-field">
+              <label>Home Postcode</label>
+              <div class="field-value">${surveyor.home_postcode || '—'}</div>
+            </div>
+            <div class="detail-field">
+              <label>Travel Radius</label>
+              <div class="field-value">${surveyor.radius_miles ? surveyor.radius_miles + ' miles' : '—'}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Insurance & Compliance</div>
+          <div class="detail-grid">
+            ${insuranceRow('Professional Indemnity', surveyor.pi_policy_number, surveyor.pi_expiry_date)}
+            ${insuranceRow('Public Liability', surveyor.pl_policy_number, surveyor.pl_expiry_date)}
+            ${insuranceRow('DBS Check', surveyor.dbs_number, surveyor.dbs_expiry_date)}
+          </div>
+        </div>
+
+        ${surveyor.professional_memberships || surveyor.qualifications ? `
+        <div class="card">
+          <div class="card-title">Qualifications</div>
+          <div class="detail-grid">
+            ${surveyor.professional_memberships ? `
+            <div class="detail-field" style="grid-column:1/-1">
+              <label>Professional Memberships</label>
+              <div class="field-value">${surveyor.professional_memberships}</div>
+            </div>` : ''}
+            ${surveyor.qualifications ? `
+            <div class="detail-field" style="grid-column:1/-1">
+              <label>Qualifications</label>
+              <div class="field-value">${surveyor.qualifications}</div>
+            </div>` : ''}
+          </div>
+        </div>` : ''}
+
+        <div class="card">
+          <div class="card-title">Jobs (${surveyorJobs.length})</div>
+          ${surveyorJobs.length > 0 ? `
+          <table class="data-table">
+            <thead><tr><th>Ref</th><th>Type</th><th>Survey Date</th><th>Job Value</th><th>Surveyor Pay</th><th>Status</th></tr></thead>
+            <tbody>${jobRows}</tbody>
+          </table>` : `<div class="empty-state" style="padding:24px"><p>No jobs assigned yet</p></div>`}
+        </div>
+
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div class="card">
+          <div class="card-title">Quick Actions</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${surveyor.email ? `<a href="mailto:${surveyor.email}" class="btn btn-secondary w-100" style="justify-content:center;">📧 Email Surveyor</a>` : ''}
+            ${surveyor.phone ? `<a href="tel:${surveyor.phone}" class="btn btn-secondary w-100" style="justify-content:center;">📞 Call Surveyor</a>` : ''}
+            <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="renderEdit()">✏️ Edit Details</button>
+            <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="toggleActive()">
+              ${surveyor.is_active ? '⏸ Pause Account' : '✅ Reactivate Account'}
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Record Info</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="detail-field">
+              <label>Added</label>
+              <div class="field-value">${formatDate(surveyor.created_at)}</div>
+            </div>
+            ${surveyor.home_lat ? `
+            <div class="detail-field">
+              <label>Coordinates</label>
+              <div class="field-value" style="font-size:12px;color:var(--text-muted);">
+                ${Number(surveyor.home_lat).toFixed(5)}, ${Number(surveyor.home_lng).toFixed(5)}
+              </div>
+            </div>` : ''}
+          </div>
+        </div>
+
+        ${surveyor.notes ? `
+        <div class="card">
+          <div class="card-title">Notes</div>
+          <div style="font-size:13px;line-height:1.6;">${surveyor.notes}</div>
+        </div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================
+// EDIT / CREATE MODE
+// ============================================================
+
+function renderEdit() {
+  const title = isNew ? 'New Surveyor' : 'Edit Surveyor';
+  const sub   = isNew ? 'Fill in the details below to add a surveyor.' : surveyor.full_name || '';
+
+  document.getElementById('pageBody').innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="detail-ref">${title}</div>
+        <div class="detail-sub">${sub}</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;">
+      <div style="display:flex;flex-direction:column;gap:20px;">
+
+        <div class="card">
+          <div class="card-title">Contact & Rates</div>
+          <div class="detail-grid">
+            <div class="form-group">
+              <label>Full Name <span class="req">*</span></label>
+              <input type="text" class="form-control" id="eName" value="${esc(surveyor.full_name)}">
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" class="form-control" id="eEmail" value="${esc(surveyor.email)}">
+            </div>
+            <div class="form-group">
+              <label>Phone</label>
+              <input type="tel" class="form-control" id="ePhone" value="${esc(surveyor.phone)}">
+            </div>
+            <div class="form-group">
+              <label>Hourly Rate (£)</label>
+              <input type="number" class="form-control" id="eRate" step="0.01" min="0" value="${surveyor.hourly_rate || ''}">
+            </div>
+            <div class="form-group">
+              <label>Home Postcode</label>
+              <input type="text" class="form-control" id="ePostcode" value="${esc(surveyor.home_postcode)}" style="text-transform:uppercase" placeholder="e.g. SW1A 1AA">
+            </div>
+            <div class="form-group">
+              <label>Travel Radius (miles)</label>
+              <input type="number" class="form-control" id="eRadius" min="1" max="200" value="${surveyor.radius_miles || 25}">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Insurance & Compliance</div>
+          <div class="detail-grid">
+            <div class="form-group">
+              <label>PI Policy Number</label>
+              <input type="text" class="form-control" id="ePiNum" value="${esc(surveyor.pi_policy_number)}">
+            </div>
+            <div class="form-group">
+              <label>PI Expiry Date</label>
+              <input type="date" class="form-control" id="ePiExp" value="${surveyor.pi_expiry_date || ''}">
+            </div>
+            <div class="form-group">
+              <label>PL Policy Number</label>
+              <input type="text" class="form-control" id="ePlNum" value="${esc(surveyor.pl_policy_number)}">
+            </div>
+            <div class="form-group">
+              <label>PL Expiry Date</label>
+              <input type="date" class="form-control" id="ePlExp" value="${surveyor.pl_expiry_date || ''}">
+            </div>
+            <div class="form-group">
+              <label>DBS Number</label>
+              <input type="text" class="form-control" id="eDbsNum" value="${esc(surveyor.dbs_number)}">
+            </div>
+            <div class="form-group">
+              <label>DBS Expiry Date</label>
+              <input type="date" class="form-control" id="eDbsExp" value="${surveyor.dbs_expiry_date || ''}">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Qualifications</div>
+          <div class="form-group">
+            <label>Professional Memberships</label>
+            <input type="text" class="form-control" id="eMemberships" value="${esc(surveyor.professional_memberships)}" placeholder="e.g. AA, ICFor">
+          </div>
+          <div class="form-group">
+            <label>Qualifications</label>
+            <textarea class="form-control" id="eQuals" rows="3" placeholder="Qualifications and certifications...">${esc(surveyor.qualifications)}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea class="form-control" id="eNotes" rows="3" placeholder="Internal notes...">${esc(surveyor.notes)}</textarea>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div class="card">
+          <div class="card-title">${isNew ? 'Create Surveyor' : 'Save Changes'}</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <button class="btn btn-primary w-100" style="justify-content:center;" onclick="saveSurveyor()" id="saveBtn">
+              ${isNew ? '✓ Create Surveyor' : '✓ Save Changes'}
+            </button>
+            ${!isNew ? `<button class="btn btn-secondary w-100" style="justify-content:center;" onclick="renderView()">Cancel</button>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function esc(val) {
+  if (!val) return '';
+  return String(val).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function saveSurveyor() {
+  const name = document.getElementById('eName').value.trim();
+  if (!name) { showToast('Full name is required', 'error'); return; }
+
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  const data = {
+    full_name:                name,
+    email:                    document.getElementById('eEmail').value.trim()       || null,
+    phone:                    document.getElementById('ePhone').value.trim()       || null,
+    hourly_rate:              parseFloat(document.getElementById('eRate').value)   || null,
+    home_postcode:            document.getElementById('ePostcode').value.trim().toUpperCase() || null,
+    radius_miles:             parseInt(document.getElementById('eRadius').value)   || 25,
+    pi_policy_number:         document.getElementById('ePiNum').value.trim()       || null,
+    pi_expiry_date:           document.getElementById('ePiExp').value              || null,
+    pl_policy_number:         document.getElementById('ePlNum').value.trim()       || null,
+    pl_expiry_date:           document.getElementById('ePlExp').value              || null,
+    dbs_number:               document.getElementById('eDbsNum').value.trim()      || null,
+    dbs_expiry_date:          document.getElementById('eDbsExp').value             || null,
+    professional_memberships: document.getElementById('eMemberships').value.trim() || null,
+    qualifications:           document.getElementById('eQuals').value.trim()       || null,
+    notes:                    document.getElementById('eNotes').value.trim()       || null,
+  };
+
+  try {
+    if (isNew) {
+      const result = await dbInsert('surveyors', data);
+      const created = Array.isArray(result) ? result[0] : result;
+      showToast('Surveyor created');
+      window.location.href = `surveyor-detail.html?id=${created.id}`;
+    } else {
+      await dbUpdate('surveyors', `id=eq.${surveyorId}`, data);
+      Object.assign(surveyor, data);
+      document.getElementById('pageTitle').textContent = name;
+      showToast('Surveyor updated');
+      renderView();
+    }
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = isNew ? '✓ Create Surveyor' : '✓ Save Changes';
+  }
+}
+
+async function toggleActive() {
+  const newState = !surveyor.is_active;
+  try {
+    await dbUpdate('surveyors', `id=eq.${surveyorId}`, { is_active: newState });
+    surveyor.is_active = newState;
+    showToast(newState ? 'Account reactivated' : 'Account paused');
+    renderView();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+init();
+</script>
+</body>
+</html>

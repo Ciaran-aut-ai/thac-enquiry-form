@@ -443,9 +443,7 @@ function renderJob() {
         <div class="card">
           <div class="card-title">Quick Actions</div>
           <div style="display:flex;flex-direction:column;gap:8px;">
-            <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="showToast('Surveyor dispatch coming in Sprint 3','warning')">
-              📍 Dispatch to Map
-            </button>
+            ${renderDispatchButton()}
             ${renderInvoiceActions()}
           </div>
         </div>
@@ -589,6 +587,41 @@ async function submitPaid() {
     Object.assign(job, updates);
     closePaidModal();
     showToast('Invoice marked as paid');
+    renderJob();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// DISPATCH TO MAP
+// ============================================================
+
+function renderDispatchButton() {
+  const d = job.dispatch_state;
+  if (d === 'pending_approval') {
+    return `<button class="btn btn-primary w-100" style="justify-content:center;background:var(--green-dark);" onclick="approveToMap()">
+      ✅ Approve to Map
+    </button>`;
+  }
+  if (d === 'red') {
+    return `<button class="btn btn-secondary w-100" style="justify-content:center;" disabled>
+      🔴 Live on Map
+    </button>`;
+  }
+  if (d === 'archived') return '';
+  // Claimed / Attended / Report Sent — dispatched, no action needed here
+  return `<button class="btn btn-secondary w-100" style="justify-content:center;" disabled>
+    📍 Dispatched
+  </button>`;
+}
+
+async function approveToMap() {
+  if (!confirm('Approve this job to the surveyor map? It will become visible to eligible surveyors.')) return;
+  try {
+    await dbUpdate('jobs', `id=eq.${jobId}`, { dispatch_state: 'red' });
+    job.dispatch_state = 'red';
+    showToast('Job approved — live on map 🔴');
     renderJob();
   } catch (e) {
     showToast('Error: ' + e.message, 'error');

@@ -15,26 +15,157 @@
 <script>
 requireAuth();
 
+let allSurveyors = [];
+let activeFilter = 'all';
+let searchQuery  = '';
+
 async function init() {
   document.getElementById('app').innerHTML = `
     ${renderSidebar('surveyors')}
     <div class="main-content">
       <div class="topbar">
         <div class="topbar-title">Surveyors</div>
+        <div class="topbar-search">
+          <span>🔍</span>
+          <input type="text" placeholder="Search by name, email..." oninput="handleSearch(this.value)">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="window.location.href='surveyor-detail.html?new=1'">+ Add Surveyor</button>
       </div>
       <div class="page-body">
         <div class="card">
-          <div class="card-title">Surveyor Management</div>
-          <div class="empty-state">
-            <div class="empty-icon">🔍</div>
-            <h3>Coming in Sprint 3</h3>
-            <p>Surveyor onboarding, insurance tracking, and field dispatch will be built in Sprint 3 alongside the mobile app and Google Maps integration.</p>
+          <div class="card-title">
+            All Surveyors
+            <span style="font-size:13px;font-weight:400;color:var(--text-muted)" id="surveyorCount"></span>
           </div>
+          <div class="filter-bar">
+            <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+            <button class="filter-btn" onclick="setFilter('active', this)">✅ Active</button>
+            <button class="filter-btn" onclick="setFilter('paused', this)">⏸ Paused</button>
+            <button class="filter-btn" onclick="setFilter('expiring', this)">🟠 Insurance Expiring</button>
+            <button class="filter-btn" onclick="setFilter('expired', this)">🔴 Insurance Expired</button>
+          </div>
+          <div id="surveyorsTable"><div class="loading"><div class="spinner"></div><br>Loading surveyors...</div></div>
         </div>
       </div>
     </div>
   `;
+
+  await loadSurveyors();
   await loadEnquiryBadge();
+}
+
+async function loadSurveyors() {
+  try {
+    const data = await dbGet('surveyors', {
+      'select': 'id,full_name,email,phone,hourly_rate,radius_miles,pi_expiry_date,pl_expiry_date,dbs_expiry_date,is_active,created_at',
+      'order': 'full_name.asc'
+    });
+    allSurveyors = data || [];
+    renderTable();
+  } catch (e) {
+    document.getElementById('surveyorsTable').innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+// Traffic-light status for an expiry date
+function expiryStatus(dateStr) {
+  if (!dateStr) return { cls: 'badge-low', label: '— Not set' };
+  const days = Math.floor((new Date(dateStr) - Date.now()) / (1000 * 60 * 60 * 24));
+  if (days < 0)    return { cls: 'badge-urgent',   label: '🔴 Expired' };
+  if (days <= 30)  return { cls: 'badge-elevated', label: '🟠 ' + days + 'd left' };
+  return { cls: 'badge-accepted', label: '🟢 Valid' };
+}
+
+function worstInsuranceStatus(s) {
+  const pi = expiryStatus(s.pi_expiry_date);
+  const pl = expiryStatus(s.pl_expiry_date);
+  const rank = s => s.cls === 'badge-urgent' ? 0 : s.cls === 'badge-elevated' ? 1 : s.cls === 'badge-accepted' ? 2 : 3;
+  return rank(pi) <= rank(pl) ? pi : pl;
+}
+
+function renderTable() {
+  let filtered = [...allSurveyors];
+
+  if (activeFilter === 'active')   filtered = filtered.filter(s => s.is_active);
+  if (activeFilter === 'paused')   filtered = filtered.filter(s => !s.is_active);
+  if (activeFilter === 'expiring') filtered = filtered.filter(s =>
+    expiryStatus(s.pi_expiry_date).cls === 'badge-elevated' ||
+    expiryStatus(s.pl_expiry_date).cls === 'badge-elevated'
+  );
+  if (activeFilter === 'expired') filtered = filtered.filter(s =>
+    expiryStatus(s.pi_expiry_date).cls === 'badge-urgent' ||
+    expiryStatus(s.pl_expiry_date).cls === 'badge-urgent'
+  );
+
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    filtered = filtered.filter(s =>
+      (s.full_name || '').toLowerCase().includes(q) ||
+      (s.email     || '').toLowerCase().includes(q)
+    );
+  }
+
+  document.getElementById('surveyorCount').textContent = `${filtered.length} surveyor${filtered.length !== 1 ? 's' : ''}`;
+
+  if (filtered.length === 0) {
+    document.getElementById('surveyorsTable').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <h3>No surveyors yet</h3>
+        <p>Add a surveyor using the button in the top-right</p>
+      </div>`;
+    return;
+  }
+
+  const rows = filtered.map(s => {
+    const pi  = expiryStatus(s.pi_expiry_date);
+    const pl  = expiryStatus(s.pl_expiry_date);
+    const dbs = expiryStatus(s.dbs_expiry_date);
+    const active = s.is_active
+      ? `<span class="badge badge-accepted">✅ Active</span>`
+      : `<span class="badge badge-low">⏸ Paused</span>`;
+    return `
+    <tr onclick="window.location.href='surveyor-detail.html?id=${s.id}'" style="cursor:pointer">
+      <td>
+        <div style="font-weight:600;font-size:14px;">${s.full_name || '—'}</div>
+        <div class="muted">${s.email || ''}</div>
+      </td>
+      <td>${s.hourly_rate ? '£' + Number(s.hourly_rate).toFixed(2) + '/hr' : '—'}</td>
+      <td>${s.radius_miles ? s.radius_miles + ' miles' : '—'}</td>
+      <td><span class="badge ${pi.cls}">${pi.label}</span></td>
+      <td><span class="badge ${pl.cls}">${pl.label}</span></td>
+      <td><span class="badge ${dbs.cls}">${dbs.label}</span></td>
+      <td>${active}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('surveyorsTable').innerHTML = `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Rate</th>
+          <th>Radius</th>
+          <th>PI Insurance</th>
+          <th>PL Insurance</th>
+          <th>DBS</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function setFilter(filter, btn) {
+  activeFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable();
+}
+
+function handleSearch(q) {
+  searchQuery = q;
+  renderTable();
 }
 
 init();
