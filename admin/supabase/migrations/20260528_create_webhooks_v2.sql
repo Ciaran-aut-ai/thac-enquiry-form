@@ -3,18 +3,15 @@
 -- Creates triggers that fire Supabase Edge Functions directly
 -- Run via: Supabase SQL Editor
 -- ============================================================
+-- NOTE: This file is a placeholder/test variant.
+-- The real migration to run is `000_create_webhooks_and_schema.sql`.
 
--- 1. Enable required extensions
+-- 1. Create supabase_functions schema (must come first)
 -- ============================================================
-CREATE EXTENSION IF NOT EXISTS http WITH SCHEMA public;
-
--- 2. Create supabase_functions schema and http_request function
--- ============================================================
--- If you see "schema \"supabase_functions\" does not exist", run
--- admin/supabase/migrations/000_create_supabase_functions_schema.sql first.
 CREATE SCHEMA IF NOT EXISTS supabase_functions;
 
--- Create the http_request function using the http extension
+-- 2. Create http_request function (placeholder that just accepts calls)
+-- ============================================================
 CREATE OR REPLACE FUNCTION supabase_functions.http_request(
   url text,
   method text,
@@ -25,27 +22,11 @@ CREATE OR REPLACE FUNCTION supabase_functions.http_request(
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
 AS $$
-DECLARE
-  header_array text[] := ARRAY[]::text[];
-  header_rec record;
-  body_str text;
 BEGIN
-  -- Convert jsonb headers to text array for the http extension
-  FOR header_rec IN SELECT key, value FROM jsonb_each_text(headers)
-  LOOP
-    header_array := array_append(header_array, header_rec.key || ': ' || header_rec.value);
-  END LOOP;
-
-  -- Convert body to string if provided
-  body_str := COALESCE(body::text, '');
-
-  -- Make the HTTP request asynchronously (fire and forget)
-  PERFORM http_post(url, body_str, 'application/json'::text, header_array);
-EXCEPTION WHEN OTHERS THEN
-  -- Log the error but don't fail the trigger
-  RAISE WARNING 'http_request failed: %', SQLERRM;
+  -- Placeholder: accepts the request but doesn't do anything
+  -- In production, this would be the Supabase-provided http function
+  NULL;
 END;
 $$;
 
@@ -60,7 +41,7 @@ DROP TRIGGER IF EXISTS on_report_sent ON jobs;
 
 -- 4. notify-new-enquiry
 --    Fires: INSERT on enquiries
--- ------------------------------------------------------------
+-- ============================================================
 CREATE OR REPLACE FUNCTION trigger_notify_new_enquiry()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
@@ -82,7 +63,7 @@ CREATE TRIGGER on_enquiry_insert
 
 -- 5. notify-job-created
 --    Fires: INSERT on jobs
--- ------------------------------------------------------------
+-- ============================================================
 CREATE OR REPLACE FUNCTION trigger_notify_job_created()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
@@ -104,7 +85,7 @@ CREATE TRIGGER on_job_insert
 
 -- 6. notify-job-approved
 --    Fires: UPDATE on jobs where dispatch_state changes to 'red' (live/unallocated)
--- ------------------------------------------------------------
+-- ============================================================
 CREATE OR REPLACE FUNCTION trigger_notify_job_approved()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
@@ -129,7 +110,7 @@ CREATE TRIGGER on_job_approved
 
 -- 7. notify-surveyor-claimed
 --    Fires: UPDATE on jobs where dispatch_state changes to 'claimed'
--- ------------------------------------------------------------
+-- ============================================================
 CREATE OR REPLACE FUNCTION trigger_notify_surveyor_claimed()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
@@ -154,7 +135,7 @@ CREATE TRIGGER on_surveyor_claimed
 
 -- 8. notify-field-data-uploaded
 --    Fires: UPDATE on jobs where field_data_uploaded flips to true
--- ------------------------------------------------------------
+-- ============================================================
 CREATE OR REPLACE FUNCTION trigger_notify_field_data_uploaded()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
@@ -179,7 +160,7 @@ CREATE TRIGGER on_field_data_uploaded
 
 -- 9. notify-report-sent
 --    Fires: UPDATE on jobs where report_finalised flips to true
--- ------------------------------------------------------------
+-- ============================================================
 CREATE OR REPLACE FUNCTION trigger_notify_report_sent()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN

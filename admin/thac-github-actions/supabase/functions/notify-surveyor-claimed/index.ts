@@ -11,7 +11,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { sendEmail, emailWrapper, urgencyBadge, ADMIN_EMAIL } from '../_shared/email-templates.ts';
 
 const SUPABASE_URL     = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const SUPABASE_SERVICE_KEY = Deno.env.get('SB_THAC_SERVICE_ROLE_KEY')!;
 
 // Fetch surveyor name from users table via surveyor record
 async function getSurveyorName(surveyorId: string): Promise<string> {

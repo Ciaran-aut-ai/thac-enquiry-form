@@ -15,9 +15,6 @@
 <script>
 requireAuth();
 
-// ============================================================
-// RENDER PAGE
-// ============================================================
 async function init() {
   document.getElementById('app').innerHTML = `
     ${renderSidebar('dashboard')}
@@ -35,19 +32,19 @@ async function init() {
         <!-- Stat Cards -->
         <div class="stat-grid" id="statGrid">
           <div class="stat-card urgent">
-            <div class="stat-label">🔴 Urgent (1 day)</div>
+            <div class="stat-label">🔴 Urgent Jobs</div>
             <div class="stat-value" id="statUrgent">—</div>
-            <div class="stat-sub">Needs immediate action</div>
+            <div class="stat-sub">Due within 1 working day</div>
           </div>
           <div class="stat-card elevated">
-            <div class="stat-label">🟠 Elevated (3 days)</div>
+            <div class="stat-label">🟠 Elevated Jobs</div>
             <div class="stat-value" id="statElevated">—</div>
-            <div class="stat-sub">Action this week</div>
+            <div class="stat-sub">Due within 3 working days</div>
           </div>
           <div class="stat-card standard">
-            <div class="stat-label">🟡 Standard (5 days)</div>
+            <div class="stat-label">🟡 Standard Jobs</div>
             <div class="stat-value" id="statStandard">—</div>
-            <div class="stat-sub">On track</div>
+            <div class="stat-sub">Due within 5 working days</div>
           </div>
           <div class="stat-card complete">
             <div class="stat-label">✅ New Enquiries</div>
@@ -62,7 +59,7 @@ async function init() {
           <!-- Urgency Dashboard -->
           <div class="card">
             <div class="card-title">
-              Urgency Dashboard
+              Active Jobs by Urgency
               <a href="jobs.html" class="btn btn-secondary btn-sm">View All Jobs</a>
             </div>
             <div id="urgencyDashboard"><div class="loading"><div class="spinner"></div><br>Loading jobs...</div></div>
@@ -91,18 +88,18 @@ async function init() {
 }
 
 // ============================================================
-// STATS
+// STATS — job counts by urgency state
 // ============================================================
 async function loadStats() {
   try {
     const [urgent, elevated, standard, newEnquiries] = await Promise.all([
-      dbGet('enquiries', { 'deadline_tier': 'eq.1day', 'status': 'eq.new', 'select': 'id' }),
-      dbGet('enquiries', { 'deadline_tier': 'eq.3days', 'status': 'eq.new', 'select': 'id' }),
-      dbGet('enquiries', { 'deadline_tier': 'eq.5days', 'status': 'eq.new', 'select': 'id' }),
-      dbGet('enquiries', { 'status': 'eq.new', 'select': 'id' })
+      dbGet('jobs',     { 'urgency_state': 'eq.red',    'is_archived': 'not.eq.true', 'select': 'id' }),
+      dbGet('jobs',     { 'urgency_state': 'eq.orange',  'is_archived': 'not.eq.true', 'select': 'id' }),
+      dbGet('jobs',     { 'urgency_state': 'eq.yellow',  'is_archived': 'not.eq.true', 'select': 'id' }),
+      dbGet('enquiries',{ 'status': 'eq.new', 'select': 'id' })
     ]);
 
-    document.getElementById('statUrgent').textContent   = urgent?.length || 0;
+    document.getElementById('statUrgent').textContent   = urgent?.length   || 0;
     document.getElementById('statElevated').textContent = elevated?.length || 0;
     document.getElementById('statStandard').textContent = standard?.length || 0;
     document.getElementById('statNew').textContent      = newEnquiries?.length || 0;
@@ -112,42 +109,78 @@ async function loadStats() {
 }
 
 // ============================================================
-// URGENCY DASHBOARD
+// URGENCY DASHBOARD — active jobs sorted by urgency state
 // ============================================================
+
+function jobUrgencyRowClass(state) {
+  switch (state) {
+    case 'red':    return 'urgency-urgent';
+    case 'orange': return 'urgency-elevated';
+    case 'yellow': return 'urgency-standard';
+    default:       return 'urgency-low';
+  }
+}
+
+function dispatchBadge(state) {
+  const map = {
+    pending_approval: ['⏳ Pending', 'badge-low'],
+    red:      ['🔴 Unallocated', 'badge-urgent'],
+    orange:   ['🟠 Claimed',     'badge-elevated'],
+    yellow:   ['🟡 Attended',    'badge-standard'],
+    green:    ['🟢 Report Sent', 'badge-accepted'],
+    archived: ['📦 Archived',   'badge-low'],
+  };
+  const [label, cls] = map[state] || [state || '—', 'badge-low'];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function urgencyStateBadge(state) {
+  const map = {
+    red:    ['🔴 Urgent',   'badge-urgent'],
+    orange: ['🟠 Elevated', 'badge-elevated'],
+    yellow: ['🟡 Standard', 'badge-standard'],
+    grey:   ['⚫ Low',      'badge-low'],
+    green:  ['🟢 Complete', 'badge-accepted'],
+  };
+  const [label, cls] = map[state] || [state || '—', 'badge-low'];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
 async function loadUrgencyDashboard() {
   try {
-    const enquiries = await dbGet('enquiries', {
-      'select': 'id,job_number,contact_name,survey_type,site_postcode,deadline_tier,status,submitted_at',
-      'status': 'neq.spam',
-      'order': 'submitted_at.desc',
-      'limit': 25
+    const jobs = await dbGet('jobs', {
+      'select': 'id,reference,survey_type,job_type,urgency_state,dispatch_state,site_postcode,survey_date,agreed_amount',
+      'is_archived': 'not.eq.true',
+      'order': 'created_at.desc',
+      'limit': 50
     });
 
-    if (!enquiries || enquiries.length === 0) {
+    if (!jobs || jobs.length === 0) {
       document.getElementById('urgencyDashboard').innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">📋</div>
+          <div class="empty-icon">💼</div>
           <h3>No active jobs</h3>
-          <p>New enquiries will appear here</p>
+          <p>Jobs will appear here once enquiries are converted</p>
         </div>`;
       return;
     }
 
-    // Sort by urgency
-    const order = { '1day': 0, '3days': 1, '5days': 2, '10days': 3 };
-    enquiries.sort((a, b) => (order[a.deadline_tier] || 99) - (order[b.deadline_tier] || 99));
+    // Sort red → orange → yellow → grey → green
+    const order = { red: 0, orange: 1, yellow: 2, grey: 3, green: 4 };
+    jobs.sort((a, b) => (order[a.urgency_state] ?? 99) - (order[b.urgency_state] ?? 99));
 
-    const rows = enquiries.map(e => `
-      <tr class="${getUrgencyRowClass(e.deadline_tier)}" onclick="window.location.href='enquiry-detail.html?id=${e.id}'" style="cursor:pointer">
+    const rows = jobs.map(j => `
+      <tr class="${jobUrgencyRowClass(j.urgency_state)}"
+          onclick="window.location.href='job-detail.html?id=${j.id}'" style="cursor:pointer">
         <td>
-          <div class="ref">${e.job_number || 'Pending'}</div>
-          <div class="muted">${timeAgo(e.submitted_at)}</div>
+          <div class="ref">${j.reference || '—'}</div>
+          <div class="muted">${j.survey_date ? formatDate(j.survey_date) : 'No date'}</div>
         </td>
-        <td>${e.contact_name || '—'}</td>
-        <td>${getSurveyLabel(e.survey_type)}</td>
-        <td>${e.site_postcode || '—'}</td>
-        <td>${urgencyBadge(e.deadline_tier)}</td>
-        <td>${statusBadge(e.status)}</td>
+        <td>${getSurveyLabel(j.survey_type || j.job_type)}</td>
+        <td>${j.site_postcode || '—'}</td>
+        <td>${j.agreed_amount ? '£' + Number(j.agreed_amount).toLocaleString() : '—'}</td>
+        <td>${urgencyStateBadge(j.urgency_state)}</td>
+        <td>${dispatchBadge(j.dispatch_state)}</td>
       </tr>
     `).join('');
 
@@ -156,11 +189,11 @@ async function loadUrgencyDashboard() {
         <thead>
           <tr>
             <th>Reference</th>
-            <th>Client</th>
             <th>Survey Type</th>
             <th>Postcode</th>
+            <th>Value</th>
             <th>Urgency</th>
-            <th>Status</th>
+            <th>Dispatch</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>

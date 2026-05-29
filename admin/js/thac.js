@@ -152,11 +152,29 @@ function renderSidebar(activePage) {
   const user = getUser();
   const initials = user?.email ? user.email[0].toUpperCase() : 'T';
 
+  setTimeout(() => {
+    const topbar = document.querySelector('.topbar');
+    if (topbar && !topbar.querySelector('.menu-toggle')) {
+      const btn = document.createElement('button');
+      btn.className = 'menu-toggle';
+      btn.innerHTML = '☰';
+      btn.setAttribute('onclick', 'toggleSidebar()');
+      btn.setAttribute('aria-label', 'Open menu');
+      topbar.insertBefore(btn, topbar.firstChild);
+    }
+  }, 0);
+
   return `
-    <aside class="sidebar">
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-logo">
-        <div class="logo-name">🌳 THAC</div>
-        <div class="logo-sub">Trevor Heaps Arboricultural</div>
+        <div style="display:flex;align-items:center;">
+          <div>
+            <div class="logo-name">🌳 THAC</div>
+            <div class="logo-sub">Trevor Heaps Arboricultural</div>
+          </div>
+          <button class="sidebar-close" onclick="closeSidebar()" aria-label="Close menu">✕</button>
+        </div>
       </div>
       <nav class="sidebar-nav">
         <div class="nav-section">Main</div>
@@ -190,6 +208,16 @@ function renderSidebar(activePage) {
       </div>
     </aside>
   `;
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('active');
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('active');
 }
 
 // Load new enquiry count into sidebar badge

@@ -53,6 +53,49 @@ Public-facing enquiry form for submitting THAC requests.
    - Admin dashboard requires Supabase configuration
    - Refer to individual project documentation
 
+## Local Supabase CLI
+
+Use the portable Supabase CLI wrappers in the repo root:
+
+```cmd
+supabase-version.cmd
+supabase-start.cmd
+supabase-link.cmd
+supabase-login.cmd
+```
+
+If the normal wrapper does not show output, you can also verify the bundled Node-based CLI directly:
+
+```cmd
+run-supabase.cmd --version
+```
+
+If your triggers are not firing after inserts, run the combined webhook migration in Supabase SQL Editor:
+
+```text
+admin/supabase/migrations/000_create_webhooks_and_schema.sql
+```
+
+> Important: Supabase SQL Editor expects raw SQL. Open the file, copy its content, paste it into SQL Editor, then execute it.
+
+If Docker is installed, run:
+
+```cmd
+supabase-start.cmd
+```
+
+Then log in if needed:
+
+```cmd
+supabase-login.cmd
+```
+
+Then link the project:
+
+```cmd
+supabase-link.cmd
+```
+
 ## Environment Configuration
 
 ### Supabase

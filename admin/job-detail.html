@@ -6,9 +6,88 @@
 <title>THAC CRM — Job Detail</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/thac.css">
+<style>
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal {
+  background: white; border-radius: 16px; padding: 32px;
+  width: 100%; max-width: 480px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.modal-title {
+  font-size: 18px; font-weight: 700; color: var(--green-dark);
+  margin-bottom: 6px;
+}
+.modal-sub {
+  font-size: 13px; color: var(--text-muted); margin-bottom: 24px;
+}
+.modal-footer {
+  display: flex; gap: 10px; margin-top: 24px;
+}
+.inv-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.inv-row:last-child { border-bottom: none; }
+.inv-label { color: var(--text-muted); width: 90px; flex-shrink: 0; }
+.inv-amount { font-weight: 700; font-size: 16px; color: var(--green-dark); }
+.badge-overdue {
+  background: #fee2e2; color: #991b1b;
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+}
+.badge-paid {
+  background: #dcfce7; color: #166534;
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+}
+.badge-unpaid {
+  background: #fef9c3; color: #854d0e;
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+}
+</style>
 </head>
 <body>
 <div class="app-layout" id="app"></div>
+
+<!-- Raise Invoice Modal -->
+<div class="modal-overlay" id="invoiceModal" style="display:none">
+  <div class="modal">
+    <div class="modal-title" id="invModalTitle">Raise Invoice</div>
+    <div class="modal-sub">Raise this invoice in QuickBooks first, then record it here to track payment.</div>
+    <div class="form-group">
+      <label>Invoice Date <span class="req">*</span></label>
+      <input type="date" class="form-control" id="invDate">
+    </div>
+    <div class="form-group">
+      <label>Invoice Amount (£ excl VAT) <span class="req">*</span></label>
+      <input type="number" class="form-control" id="invAmount" step="0.01" min="0" placeholder="e.g. 350">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeInvoiceModal()" style="flex:1;justify-content:center;">Cancel</button>
+      <button class="btn btn-primary" onclick="submitInvoice()" style="flex:2;justify-content:center;" id="invSubmitBtn">Save Invoice</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mark Paid Modal -->
+<div class="modal-overlay" id="paidModal" style="display:none">
+  <div class="modal">
+    <div class="modal-title" id="paidModalTitle">Mark Invoice as Paid</div>
+    <div class="modal-sub">Record the payment date. This updates the CRM only — QuickBooks is the source of truth for accounts.</div>
+    <div class="form-group">
+      <label>Payment Date <span class="req">*</span></label>
+      <input type="date" class="form-control" id="paidDate">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closePaidModal()" style="flex:1;justify-content:center;">Cancel</button>
+      <button class="btn btn-primary" onclick="submitPaid()" style="flex:2;justify-content:center;">✅ Confirm Paid</button>
+    </div>
+  </div>
+</div>
 
 <script src="js/supabase.js"></script>
 <script src="js/thac.js"></script>
@@ -18,6 +97,8 @@ requireAuth();
 const params = new URLSearchParams(window.location.search);
 const jobId = params.get('id');
 let job = null;
+let invoiceTarget = 1; // 1 or 2 — which invoice number the modal is acting on
+let paidTarget = 1;
 
 if (!jobId) window.location.href = 'jobs.html';
 
@@ -56,11 +137,11 @@ async function loadJob() {
 function getDispatchBadge(state) {
   const map = {
     pending_approval: { label: '⏳ Pending Approval', cls: 'badge-low' },
-    red:    { label: '🔴 Unallocated', cls: 'badge-urgent' },
-    orange: { label: '🟠 Claimed',     cls: 'badge-elevated' },
-    yellow: { label: '🟡 Attended',    cls: 'badge-standard' },
-    green:  { label: '🟢 Report Sent', cls: 'badge-accepted' },
-    archived: { label: '📦 Archived', cls: 'badge-low' },
+    red:      { label: '🔴 Unallocated', cls: 'badge-urgent' },
+    orange:   { label: '🟠 Claimed',     cls: 'badge-elevated' },
+    yellow:   { label: '🟡 Attended',    cls: 'badge-standard' },
+    green:    { label: '🟢 Report Sent', cls: 'badge-accepted' },
+    archived: { label: '📦 Archived',   cls: 'badge-low' },
   };
   const s = map[state] || { label: state || '—', cls: 'badge-low' };
   return `<span class="badge ${s.cls}">${s.label}</span>`;
@@ -76,6 +157,112 @@ function getUrgencyBadge(state) {
   };
   const s = map[state] || { label: state || '—', cls: 'badge-low' };
   return `<span class="badge ${s.cls}">${s.label}</span>`;
+}
+
+// Returns true if an invoice raised on dateStr is now overdue (30+ days unpaid)
+function isOverdue(dateStr) {
+  if (!dateStr) return false;
+  const raised = new Date(dateStr);
+  return (Date.now() - raised.getTime()) > 30 * 24 * 60 * 60 * 1000;
+}
+
+// Renders the invoice status rows in the Financial card
+function renderInvoiceSection() {
+  const isStaged = job.billing_mode === 'staged';
+  const rows = [];
+
+  if (job.invoice1_date) {
+    const overdueFlag = (!job.invoice1_paid && isOverdue(job.invoice1_date))
+      ? `<span class="badge-overdue">Overdue</span>` : '';
+    const paidFlag = job.invoice1_paid
+      ? `<span class="badge-paid">Paid ${formatDate(job.invoice1_paid_at)}</span>`
+      : `<span class="badge-unpaid">Unpaid</span>`;
+    const label = isStaged ? 'Invoice 1' : 'Invoice';
+    rows.push(`
+      <div class="inv-row">
+        <span class="inv-label">${label}</span>
+        <span class="inv-amount">£${Number(job.invoice1_amount).toLocaleString()}</span>
+        <span style="color:var(--text-muted);font-size:12px;">${formatDate(job.invoice1_date)}</span>
+        <span style="margin-left:auto;display:flex;gap:6px;align-items:center;">${overdueFlag}${paidFlag}</span>
+      </div>`);
+  }
+
+  if (isStaged && job.invoice2_date) {
+    const overdueFlag = (!job.invoice2_paid && isOverdue(job.invoice2_date))
+      ? `<span class="badge-overdue">Overdue</span>` : '';
+    const paidFlag = job.invoice2_paid
+      ? `<span class="badge-paid">Paid ${formatDate(job.invoice2_paid_at)}</span>`
+      : `<span class="badge-unpaid">Unpaid</span>`;
+    rows.push(`
+      <div class="inv-row">
+        <span class="inv-label">Invoice 2</span>
+        <span class="inv-amount">£${Number(job.invoice2_amount).toLocaleString()}</span>
+        <span style="color:var(--text-muted);font-size:12px;">${formatDate(job.invoice2_date)}</span>
+        <span style="margin-left:auto;display:flex;gap:6px;align-items:center;">${overdueFlag}${paidFlag}</span>
+      </div>`);
+  }
+
+  if (rows.length === 0) return '';
+  return `<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">${rows.join('')}</div>`;
+}
+
+// Renders contextual invoice action buttons for the Quick Actions card
+function renderInvoiceActions() {
+  const isStaged = job.billing_mode === 'staged';
+  const buttons = [];
+
+  if (!isStaged) {
+    // Single invoice
+    if (!job.invoice1_date) {
+      buttons.push(`
+        <button class="btn btn-primary w-100" style="justify-content:center;" onclick="openInvoiceModal(1)">
+          🧾 Raise Invoice
+        </button>`);
+    } else if (!job.invoice1_paid) {
+      buttons.push(`
+        <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="openPaidModal(1)">
+          ✅ Mark Invoice Paid
+        </button>`);
+    } else {
+      buttons.push(`
+        <div style="font-size:13px;color:var(--text-muted);text-align:center;padding:8px 0;">
+          ✅ Invoice paid and archived
+        </div>`);
+    }
+  } else {
+    // Staged 50/50 — Invoice 1
+    if (!job.invoice1_date) {
+      buttons.push(`
+        <button class="btn btn-primary w-100" style="justify-content:center;" onclick="openInvoiceModal(1)">
+          🧾 Raise Invoice 1 (50%)
+        </button>`);
+    } else if (!job.invoice1_paid) {
+      buttons.push(`
+        <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="openPaidModal(1)">
+          ✅ Mark Invoice 1 Paid
+        </button>`);
+    }
+
+    // Staged — Invoice 2 (only available once Invoice 1 is raised)
+    if (job.invoice1_date && !job.invoice2_date) {
+      buttons.push(`
+        <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="openInvoiceModal(2)">
+          🧾 Raise Invoice 2 (50%)
+        </button>`);
+    } else if (job.invoice2_date && !job.invoice2_paid) {
+      buttons.push(`
+        <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="openPaidModal(2)">
+          ✅ Mark Invoice 2 Paid
+        </button>`);
+    } else if (job.invoice1_paid && job.invoice2_paid) {
+      buttons.push(`
+        <div style="font-size:13px;color:var(--text-muted);text-align:center;padding:8px 0;">
+          ✅ Both invoices paid and archived
+        </div>`);
+    }
+  }
+
+  return buttons.join('');
 }
 
 function renderJob() {
@@ -123,34 +310,60 @@ function renderJob() {
             </div>
             <div class="detail-field">
               <label>Billing Mode</label>
-              <div class="field-value">${job.billing_mode ? job.billing_mode.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase()) : '—'}</div>
+              <div class="field-value">${job.billing_mode === 'staged' ? 'Staged 50/50' : 'Single Invoice'}</div>
             </div>
           </div>
         </div>
 
         <!-- Financial -->
         <div class="card">
-          <div class="card-title">Financial</div>
-          <div class="detail-grid">
-            <div class="detail-field">
-              <label>Quoted Amount</label>
-              <div class="field-value">${job.quoted_amount ? '£' + Number(job.quoted_amount).toLocaleString() : '—'}</div>
-            </div>
-            <div class="detail-field">
-              <label>Agreed Amount</label>
-              <div class="field-value" style="font-size:20px;font-weight:700;color:var(--green-mid);">
-                ${job.agreed_amount ? '£' + Number(job.agreed_amount).toLocaleString() : '—'}
+          <div class="card-title">
+            Financial
+            <button id="editFinBtn" class="btn btn-secondary btn-sm" onclick="toggleFinancialEdit()">Edit</button>
+          </div>
+          <div id="financialView">
+            <div class="detail-grid">
+              <div class="detail-field">
+                <label>Quoted Amount</label>
+                <div class="field-value">${job.quoted_amount ? '£' + Number(job.quoted_amount).toLocaleString() : '—'}</div>
+              </div>
+              <div class="detail-field">
+                <label>Agreed Amount</label>
+                <div class="field-value" style="font-size:20px;font-weight:700;color:var(--green-mid);">
+                  ${job.agreed_amount ? '£' + Number(job.agreed_amount).toLocaleString() : '—'}
+                </div>
+              </div>
+              <div class="detail-field">
+                <label>Urgency Surcharge</label>
+                <div class="field-value">${job.urgency_surcharge ? '£' + Number(job.urgency_surcharge).toLocaleString() : '—'}</div>
+              </div>
+              <div class="detail-field">
+                <label>Surveyor Pay</label>
+                <div class="field-value">${job.surveyor_pay_amount ? '£' + Number(job.surveyor_pay_amount).toLocaleString() : '—'}</div>
               </div>
             </div>
-            <div class="detail-field">
-              <label>Urgency Surcharge</label>
-              <div class="field-value">${job.urgency_surcharge ? '£' + Number(job.urgency_surcharge).toLocaleString() : '—'}</div>
+          </div>
+          <div id="financialEdit" style="display:none;margin-top:8px;">
+            <div class="detail-grid">
+              <div class="form-group">
+                <label>Agreed Amount (£)</label>
+                <input type="number" class="form-control" id="finAgreed" step="0.01" min="0" value="${job.agreed_amount || ''}">
+              </div>
+              <div class="form-group">
+                <label>Urgency Surcharge (£)</label>
+                <input type="number" class="form-control" id="finSurcharge" step="0.01" min="0" value="${job.urgency_surcharge || ''}">
+              </div>
+              <div class="form-group">
+                <label>Surveyor Pay (£)</label>
+                <input type="number" class="form-control" id="finSurveyor" step="0.01" min="0" value="${job.surveyor_pay_amount || ''}">
+              </div>
             </div>
-            <div class="detail-field">
-              <label>Surveyor Pay</label>
-              <div class="field-value">${job.surveyor_pay_amount ? '£' + Number(job.surveyor_pay_amount).toLocaleString() : '—'}</div>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+              <button class="btn btn-secondary" onclick="toggleFinancialEdit()">Cancel</button>
+              <button class="btn btn-primary" onclick="saveFinancials()">Save</button>
             </div>
           </div>
+          ${renderInvoiceSection()}
         </div>
 
         <!-- Progress Checklist -->
@@ -172,11 +385,27 @@ function renderJob() {
           </div>
         </div>
 
-        ${job.internal_notes ? `
+        <!-- Internal Notes (always shown) -->
         <div class="card">
-          <div class="card-title">Internal Notes</div>
-          <div style="font-size:13px;line-height:1.6;background:var(--amber-light);padding:12px;border-radius:8px;">${job.internal_notes}</div>
-        </div>` : ''}
+          <div class="card-title">
+            Internal Notes
+            <button class="btn btn-secondary btn-sm" id="editNoteBtn" onclick="toggleNoteEditor()">
+              ${job.internal_notes ? 'Edit' : 'Add note'}
+            </button>
+          </div>
+          <div id="noteDisplay">
+            ${job.internal_notes
+              ? `<div style="font-size:13px;line-height:1.6;background:var(--amber-light);padding:12px;border-radius:8px;">${job.internal_notes}</div>`
+              : `<div style="font-size:13px;color:var(--text-muted);">No notes yet.</div>`}
+          </div>
+          <div id="noteEditor" style="display:none;margin-top:8px;">
+            <textarea class="form-control" id="noteText" rows="4" placeholder="Add internal notes...">${job.internal_notes || ''}</textarea>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <button class="btn btn-secondary" onclick="toggleNoteEditor()">Cancel</button>
+              <button class="btn btn-primary" onclick="saveNote()">Save Note</button>
+            </div>
+          </div>
+        </div>
 
       </div>
 
@@ -200,11 +429,11 @@ function renderJob() {
             <label>Dispatch State</label>
             <select class="form-control" id="dispatchSelect">
               <option value="pending_approval" ${job.dispatch_state==='pending_approval'?'selected':''}>⏳ Pending Approval</option>
-              <option value="red"    ${job.dispatch_state==='red'    ?'selected':''}>🔴 Unallocated</option>
-              <option value="orange" ${job.dispatch_state==='orange' ?'selected':''}>🟠 Claimed</option>
-              <option value="yellow" ${job.dispatch_state==='yellow' ?'selected':''}>🟡 Attended</option>
-              <option value="green"  ${job.dispatch_state==='green'  ?'selected':''}>🟢 Report Sent</option>
-              <option value="archived" ${job.dispatch_state==='archived'?'selected':''}>📦 Archived</option>
+              <option value="red"      ${job.dispatch_state==='red'      ?'selected':''}>🔴 Unallocated</option>
+              <option value="orange"   ${job.dispatch_state==='orange'   ?'selected':''}>🟠 Claimed</option>
+              <option value="yellow"   ${job.dispatch_state==='yellow'   ?'selected':''}>🟡 Attended</option>
+              <option value="green"    ${job.dispatch_state==='green'    ?'selected':''}>🟢 Report Sent</option>
+              <option value="archived" ${job.dispatch_state==='archived' ?'selected':''}>📦 Archived</option>
             </select>
           </div>
           <button class="btn btn-primary w-100" onclick="updateStates()" style="justify-content:center;">Save</button>
@@ -217,9 +446,7 @@ function renderJob() {
             <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="showToast('Surveyor dispatch coming in Sprint 3','warning')">
               📍 Dispatch to Map
             </button>
-            <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="showToast('Invoice tracking coming in Sprint 2','warning')">
-              🧾 Mark Invoiced
-            </button>
+            ${renderInvoiceActions()}
           </div>
         </div>
 
@@ -255,6 +482,168 @@ async function updateStates() {
     job.urgency_state = urgency_state;
     job.dispatch_state = dispatch_state;
     showToast('Job updated successfully');
+    renderJob();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// INVOICE MODAL
+// ============================================================
+
+function openInvoiceModal(num) {
+  invoiceTarget = num;
+  const isStaged = job.billing_mode === 'staged';
+  const title = isStaged ? `Raise Invoice ${num} (50%)` : 'Raise Invoice';
+  document.getElementById('invModalTitle').textContent = title;
+
+  // Pre-fill today's date
+  document.getElementById('invDate').value = new Date().toISOString().slice(0, 10);
+
+  // Pre-fill amount: staged = 50% of agreed, single = full agreed
+  const agreed = Number(job.agreed_amount) || 0;
+  const prefill = isStaged ? (agreed / 2).toFixed(2) : agreed.toFixed(2);
+  document.getElementById('invAmount').value = prefill > 0 ? prefill : '';
+
+  document.getElementById('invoiceModal').style.display = 'flex';
+}
+
+function closeInvoiceModal() {
+  document.getElementById('invoiceModal').style.display = 'none';
+}
+
+async function submitInvoice() {
+  const date = document.getElementById('invDate').value;
+  const amount = parseFloat(document.getElementById('invAmount').value);
+
+  if (!date) { showToast('Please enter an invoice date', 'error'); return; }
+  if (!amount || amount <= 0) { showToast('Please enter a valid amount', 'error'); return; }
+
+  const btn = document.getElementById('invSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    const isStaged = job.billing_mode === 'staged';
+    const updates = {};
+
+    if (invoiceTarget === 1) {
+      updates.invoice1_date   = date;
+      updates.invoice1_amount = amount;
+      // Single invoice or staged invoice 2 not yet raised: don't archive yet for staged
+      if (!isStaged) {
+        updates.is_archived    = true;
+        updates.dispatch_state = 'archived';
+        updates.urgency_state  = 'green';
+      }
+    } else {
+      updates.invoice2_date   = date;
+      updates.invoice2_amount = amount;
+      // Raising Invoice 2 completes the staged billing — archive the job
+      updates.is_archived    = true;
+      updates.dispatch_state = 'archived';
+      updates.urgency_state  = 'green';
+    }
+
+    await dbUpdate('jobs', `id=eq.${jobId}`, updates);
+    Object.assign(job, updates);
+    closeInvoiceModal();
+    showToast(invoiceTarget === 1 ? 'Invoice raised' : 'Invoice 2 raised — job archived');
+    renderJob();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Invoice';
+  }
+}
+
+// ============================================================
+// MARK PAID MODAL
+// ============================================================
+
+function openPaidModal(num) {
+  paidTarget = num;
+  const isStaged = job.billing_mode === 'staged';
+  document.getElementById('paidModalTitle').textContent =
+    isStaged ? `Mark Invoice ${num} as Paid` : 'Mark Invoice as Paid';
+  document.getElementById('paidDate').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('paidModal').style.display = 'flex';
+}
+
+function closePaidModal() {
+  document.getElementById('paidModal').style.display = 'none';
+}
+
+async function submitPaid() {
+  const date = document.getElementById('paidDate').value;
+  if (!date) { showToast('Please enter a payment date', 'error'); return; }
+
+  try {
+    const updates = paidTarget === 1
+      ? { invoice1_paid: true, invoice1_paid_at: new Date(date).toISOString() }
+      : { invoice2_paid: true, invoice2_paid_at: new Date(date).toISOString() };
+
+    await dbUpdate('jobs', `id=eq.${jobId}`, updates);
+    Object.assign(job, updates);
+    closePaidModal();
+    showToast('Invoice marked as paid');
+    renderJob();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// FINANCIALS EDIT
+// ============================================================
+
+function toggleFinancialEdit() {
+  const view = document.getElementById('financialView');
+  const edit = document.getElementById('financialEdit');
+  const btn  = document.getElementById('editFinBtn');
+  const isEditing = edit.style.display !== 'none';
+  view.style.display = isEditing ? '' : 'none';
+  edit.style.display = isEditing ? 'none' : '';
+  btn.textContent = isEditing ? 'Edit' : 'Cancel';
+}
+
+async function saveFinancials() {
+  const agreed_amount       = parseFloat(document.getElementById('finAgreed').value)    || null;
+  const urgency_surcharge   = parseFloat(document.getElementById('finSurcharge').value) || null;
+  const surveyor_pay_amount = parseFloat(document.getElementById('finSurveyor').value)  || null;
+
+  try {
+    await dbUpdate('jobs', `id=eq.${jobId}`, { agreed_amount, urgency_surcharge, surveyor_pay_amount });
+    Object.assign(job, { agreed_amount, urgency_surcharge, surveyor_pay_amount });
+    showToast('Financials updated');
+    renderJob();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// INTERNAL NOTES
+// ============================================================
+
+function toggleNoteEditor() {
+  const display = document.getElementById('noteDisplay');
+  const editor  = document.getElementById('noteEditor');
+  const btn     = document.getElementById('editNoteBtn');
+  const isEditing = editor.style.display !== 'none';
+  display.style.display = isEditing ? '' : 'none';
+  editor.style.display  = isEditing ? 'none' : '';
+  btn.textContent = isEditing ? (job.internal_notes ? 'Edit' : 'Add note') : 'Cancel';
+}
+
+async function saveNote() {
+  const text = document.getElementById('noteText').value.trim();
+  try {
+    await dbUpdate('jobs', `id=eq.${jobId}`, { internal_notes: text || null });
+    job.internal_notes = text || null;
+    showToast('Note saved');
     renderJob();
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
