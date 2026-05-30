@@ -428,18 +428,35 @@ function renderJob() {
           <div class="card-title">
             Site Access
             <button class="btn btn-secondary btn-sm" id="editAccessBtn" onclick="toggleAccessEditor()">
-              ${job.site_access_notes ? 'Edit' : 'Add details'}
+              ${(job.site_access_notes || job.site_location_tag) ? 'Edit' : 'Add details'}
             </button>
           </div>
           <div id="accessDisplay">
-            ${job.site_access_notes
-              ? `<div style="font-size:13px;line-height:1.6;background:var(--bg);padding:12px;border-radius:8px;">${job.site_access_notes}</div>`
-              : `<div style="font-size:13px;color:var(--text-muted);">No access details yet — parking, gate codes, what3words, appointment requirements.</div>`}
+            ${(job.site_access_notes || job.site_location_tag) ? `
+              ${job.site_location_tag ? `
+                <div style="margin-bottom:10px;">
+                  ${renderLocationTag(job.site_location_tag)}
+                </div>` : ''}
+              ${job.site_access_notes ? `
+                <div style="font-size:13px;line-height:1.6;background:var(--bg);padding:12px;border-radius:8px;white-space:pre-wrap;">${job.site_access_notes}</div>` : ''}
+            ` : `<div style="font-size:13px;color:var(--text-muted);">No access details yet — parking, gate codes, location pin, appointment requirements.</div>`}
           </div>
           <div id="accessEditor" style="display:none;margin-top:8px;">
-            <textarea class="form-control" id="accessText" rows="4"
-              placeholder="Parking location, gate codes, what3words, appointment requirements, access restrictions...">${job.site_access_notes || ''}</textarea>
-            <div style="display:flex;gap:8px;margin-top:8px;">
+            <div class="form-group">
+              <label>Location Tag</label>
+              <input type="text" class="form-control" id="locationTag"
+                value="${job.site_location_tag || ''}"
+                placeholder="what3words (///word.word.word), Google Maps link, or coordinates">
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+                Paste any of: what3words address · Google Maps URL · lat,lng coordinates
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Access Details</label>
+              <textarea class="form-control" id="accessText" rows="4"
+                placeholder="Where to park, gate codes, padlock combinations, appointment requirements, how to find the trees from the parking spot...">${job.site_access_notes || ''}</textarea>
+            </div>
+            <div style="display:flex;gap:8px;">
               <button class="btn btn-secondary" onclick="toggleAccessEditor()">Cancel</button>
               <button class="btn btn-primary" onclick="saveAccessNotes()">Save</button>
             </div>
@@ -825,6 +842,33 @@ async function approveToMap() {
 // SITE ACCESS NOTES
 // ============================================================
 
+function renderLocationTag(tag) {
+  if (!tag) return '';
+  const trimmed = tag.trim();
+  // what3words: starts with /// or three words separated by dots
+  if (trimmed.startsWith('///') || /^[a-z]+\.[a-z]+\.[a-z]+$/i.test(trimmed)) {
+    const words = trimmed.replace(/^\/\/\//, '');
+    return `<a href="https://what3words.com/${words}" target="_blank"
+      style="display:inline-flex;align-items:center;gap:6px;background:#e8f4fd;color:#0066cc;
+             padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">
+      📍 ///${words} <span style="font-size:11px;opacity:0.7;">what3words →</span>
+    </a>`;
+  }
+  // Google Maps or any URL
+  if (trimmed.startsWith('http')) {
+    return `<a href="${trimmed}" target="_blank"
+      style="display:inline-flex;align-items:center;gap:6px;background:#e8f4fd;color:#0066cc;
+             padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">
+      🗺️ View on Map →
+    </a>`;
+  }
+  // Plain coordinates or other text
+  return `<span style="display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;
+    padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;">
+    📍 ${trimmed}
+  </span>`;
+}
+
 function toggleAccessEditor() {
   const display = document.getElementById('accessDisplay');
   const editor  = document.getElementById('accessEditor');
@@ -832,14 +876,21 @@ function toggleAccessEditor() {
   const isEditing = editor.style.display !== 'none';
   display.style.display = isEditing ? '' : 'none';
   editor.style.display  = isEditing ? 'none' : '';
-  btn.textContent = isEditing ? (job.site_access_notes ? 'Edit' : 'Add details') : 'Cancel';
+  btn.textContent = isEditing
+    ? ((job.site_access_notes || job.site_location_tag) ? 'Edit' : 'Add details')
+    : 'Cancel';
 }
 
 async function saveAccessNotes() {
   const text = document.getElementById('accessText').value.trim();
+  const tag  = document.getElementById('locationTag').value.trim();
   try {
-    await dbUpdate('jobs', `id=eq.${jobId}`, { site_access_notes: text || null });
+    await dbUpdate('jobs', `id=eq.${jobId}`, {
+      site_access_notes: text || null,
+      site_location_tag: tag  || null,
+    });
     job.site_access_notes = text || null;
+    job.site_location_tag = tag  || null;
     showToast('Site access details saved');
     renderJob();
   } catch (e) { showToast('Error: ' + e.message, 'error'); }
