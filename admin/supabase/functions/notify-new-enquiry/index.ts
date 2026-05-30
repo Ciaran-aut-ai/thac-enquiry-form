@@ -6,17 +6,43 @@
 // ============================================================
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { sendEmail, emailWrapper, urgencyBadge, ADMIN_EMAIL } from '../_shared/email-templates.ts';
+import { sendEmail, emailWrapper, ADMIN_EMAIL } from '../_shared/email-templates.ts';
+
+const SURVEY_LABELS: Record<string, string> = {
+  planning_stage1:  'Planning — Stage 1 (BS5837)',
+  planning_stage2:  'Planning — Stage 2 (AIA/AMS/TPP)',
+  health_safety:    'Tree Condition / Risk Survey',
+  insurer_mortgage: 'Insurer / Mortgage Lender',
+  subsidence:       'Building Damage / Subsidence',
+  nhbc:             'Foundation Depths (NHBC)',
+  site_visit:       'Site Visit & Advice',
+  resistograph:     'Resistograph Testing',
+  bs5837:           'BS5837 Tree Survey',
+  vta:              'Visual Tree Assessment',
+  amendment:        'Amendment',
+  other:            'Other',
+};
+
+const DEADLINE_LABELS: Record<string, string> = {
+  '1day':   'Within 1 working day',
+  '3days':  'Within 3 working days',
+  '5days':  'Within 5 working days',
+  '10days': 'Within 10 working days / No urgency',
+};
 
 serve(async (req) => {
   try {
     const payload = await req.json();
-    const record = payload.record; // the new enquiry row
+    const record = payload.record;
 
     const isAmendment = record.enquiry_type === 'amendment';
     const subject = isAmendment
       ? `📋 New Amendment Enquiry — ${record.contact_name}`
       : `📬 New Enquiry Received — ${record.contact_name}`;
+
+    const quotedPrice = record.quoted_price
+      ? `£${Number(record.quoted_price).toLocaleString('en-GB')} excl VAT`
+      : 'Custom quote (100+ trees)';
 
     const html = emailWrapper(`
       <h2>${isAmendment ? 'New Amendment Enquiry' : 'New Enquiry Received'}</h2>
@@ -52,11 +78,11 @@ serve(async (req) => {
         ${!isAmendment ? `
         <div class="detail-row">
           <span class="detail-label">Survey Type</span>
-          <span class="detail-value">${record.survey_type || '—'}</span>
+          <span class="detail-value">${SURVEY_LABELS[record.survey_type] || record.survey_type || '—'}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">Tree Count Band</span>
-          <span class="detail-value">${record.tree_count_band || '—'}</span>
+          <span class="detail-value">${record.tree_count_band ? record.tree_count_band + ' trees' : '—'}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">Site Postcode</span>
@@ -64,7 +90,11 @@ serve(async (req) => {
         </div>
         <div class="detail-row">
           <span class="detail-label">Deadline</span>
-          <span class="detail-value">${record.deadline_tier || '—'}</span>
+          <span class="detail-value">${DEADLINE_LABELS[record.deadline_tier] || record.deadline_tier || '—'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Quoted Price</span>
+          <span class="detail-value" style="color:#1a3c2e;">${quotedPrice}</span>
         </div>` : ''}
         ${isAmendment ? `
         <div class="detail-row">
@@ -81,7 +111,7 @@ serve(async (req) => {
         </div>
       </div>
 
-      <a href="https://ciaran-aut-ai.github.io/thac-admin/enquiries.html" class="cta-button">
+      <a href="https://ciaran-aut-ai.github.io/thac-admin/enquiry-detail.html?id=${record.id}" class="cta-button">
         View Enquiry in CRM →
       </a>
     `);
