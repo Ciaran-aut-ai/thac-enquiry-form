@@ -229,6 +229,32 @@ function renderView() {
           </div>
         </div>
 
+        <!-- App Access -->
+        <div class="card">
+          <div class="card-title">App Access</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="font-size:13px;color:var(--text-muted);line-height:1.5;">
+              ${surveyor.user_id
+                ? `<span style="color:var(--green-dark);font-weight:600;">✅ App account linked</span><br>
+                   <span style="font-size:11px;font-family:monospace;">${surveyor.user_id}</span>`
+                : '⚠️ No app account linked yet. Create a Supabase auth user for this surveyor then paste their UUID below.'}
+            </div>
+            <div style="display:flex;gap:8px;">
+              <input type="text" class="form-control" id="userIdInput"
+                placeholder="Paste Supabase user UUID here…"
+                value="${surveyor.user_id || ''}"
+                style="font-size:12px;font-family:monospace;">
+              <button class="btn btn-primary btn-sm" onclick="linkUserId()" style="white-space:nowrap;">
+                ${surveyor.user_id ? 'Update' : 'Link'}
+              </button>
+            </div>
+            ${surveyor.user_id ? `
+            <button class="btn btn-secondary btn-sm" style="color:#dc2626;" onclick="unlinkUserId()">
+              Remove app access
+            </button>` : ''}
+          </div>
+        </div>
+
         ${surveyor.notes ? `
         <div class="card">
           <div class="card-title">Notes</div>
@@ -400,6 +426,29 @@ async function saveSurveyor() {
     btn.disabled = false;
     btn.textContent = isNew ? '✓ Create Surveyor' : '✓ Save Changes';
   }
+}
+
+async function linkUserId() {
+  const uid = document.getElementById('userIdInput').value.trim();
+  if (!uid) { showToast('Please paste a UUID', 'error'); return; }
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidPattern.test(uid)) { showToast('That doesn\'t look like a valid UUID', 'error'); return; }
+  try {
+    await dbUpdate('surveyors', `id=eq.${surveyorId}`, { user_id: uid });
+    surveyor.user_id = uid;
+    showToast('App account linked — surveyor can now log in');
+    renderView();
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+async function unlinkUserId() {
+  if (!confirm('Remove app access? The surveyor will no longer be able to log in.')) return;
+  try {
+    await dbUpdate('surveyors', `id=eq.${surveyorId}`, { user_id: null });
+    surveyor.user_id = null;
+    showToast('App access removed');
+    renderView();
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
 }
 
 async function toggleActive() {
