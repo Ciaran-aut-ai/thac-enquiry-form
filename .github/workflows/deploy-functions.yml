@@ -33,6 +33,7 @@ jobs:
           supabase functions deploy notify-field-data-uploaded --project-ref lemppaqgpntadeylzzwn
           supabase functions deploy notify-report-sent --project-ref lemppaqgpntadeylzzwn
           supabase functions deploy notify-quote-accepted --project-ref lemppaqgpntadeylzzwn
+          supabase functions deploy notify-quote-declined --project-ref lemppaqgpntadeylzzwn
 
       - name: Set secrets
         env:

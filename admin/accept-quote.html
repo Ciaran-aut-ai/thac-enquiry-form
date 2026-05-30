@@ -242,10 +242,24 @@ function showDeclineConfirm(enq) {
     <div class="brand">Trevor Heaps Arboricultural Consultancy Ltd.</div>
     <div class="icon">🤔</div>
     <h1>Decline This Quote?</h1>
-    <p class="sub">We're sorry to hear that. Are you sure you'd like to decline?</p>
-    <div class="ref">${enq.job_number || 'Quote'}</div>
+    <p class="sub">We're sorry to hear that. Your feedback helps us improve.</p>
+    <div class="ref" style="margin-bottom:20px;">${enq.job_number || 'Quote'}</div>
+    <div style="text-align:left;margin-bottom:20px;">
+      <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;">
+        Would you mind telling us why? <span style="font-weight:400;color:#9ca3af;">(optional)</span>
+      </label>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+        ${["The price is too high","I found another provider","The timeline doesn't work","I no longer need this survey","Other"].map(r =>
+          `<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;">
+            <input type="radio" name="declineReason" value="${r}"> ${r}
+          </label>`
+        ).join('')}
+      </div>
+      <textarea id="declineOther" rows="2" placeholder="Any additional comments…"
+        style="width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box;resize:vertical;"></textarea>
+    </div>
     <button class="btn btn-decline" style="margin-bottom:12px;" onclick="declineQuote('${enq.id}')">
-      Yes, decline this quote
+      Confirm Decline
     </button>
     <button class="btn btn-accept" onclick="window.location.search='?id=${enq.id}'">
       ← Go back
@@ -392,20 +406,29 @@ function skipStep2(enquiryId, ref) {
 
 async function declineQuote(enquiryId) {
   const btn = document.querySelector('.btn-decline');
-  btn.textContent = 'Declining…';
+  btn.textContent = 'Submitting…';
   btn.disabled = true;
+
+  const selected = document.querySelector('input[name="declineReason"]:checked')?.value || '';
+  const extra    = document.getElementById('declineOther')?.value.trim() || '';
+  const reason   = [selected, extra].filter(Boolean).join(' — ') || null;
+
   try {
-    await supabasePatch('enquiries', `id=eq.${enquiryId}`, { status: 'declined' });
+    await supabasePatch('enquiries', `id=eq.${enquiryId}`, {
+      status:          'declined',
+      declined_reason: reason,
+      declined_at:     new Date().toISOString(),
+    });
     document.getElementById('card').innerHTML = `
       <div class="logo">🌳</div>
       <div class="brand">Trevor Heaps Arboricultural Consultancy Ltd.</div>
       <div class="icon">👋</div>
       <h1>Quote Declined</h1>
-      <p class="sub">No problem at all. If you change your mind or have any questions, please don't hesitate to get in touch.</p>
-      <div class="footer">Trevor Heaps Arboricultural Consultancy Ltd.<br>Thank you for considering us.</div>
+      <p class="sub">No problem at all. Thank you for letting us know${reason ? ' — your feedback is appreciated' : ''}. If you change your mind or need help in the future, we're always happy to assist.</p>
+      <div class="footer">Trevor Heaps Arboricultural Consultancy Ltd.</div>
     `;
   } catch (e) {
-    btn.textContent = 'Yes, decline this quote';
+    btn.textContent = 'Confirm Decline';
     btn.disabled = false;
     alert('Something went wrong — please try again or contact us directly.');
   }

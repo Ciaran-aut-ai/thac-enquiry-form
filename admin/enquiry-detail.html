@@ -360,6 +360,18 @@ function renderEnquiry() {
                 ✅ ${formatDateTime(enquiry.accepted_at)}
               </div>
             </div>` : ''}
+            ${enquiry.declined_at ? `
+            <div class="detail-field">
+              <label>Declined</label>
+              <div class="field-value" style="color:#dc2626;font-weight:600;">
+                ❌ ${formatDateTime(enquiry.declined_at)}
+              </div>
+            </div>` : ''}
+            ${enquiry.declined_reason ? `
+            <div class="detail-field">
+              <label>Decline Reason</label>
+              <div class="field-value" style="color:#dc2626;">${enquiry.declined_reason}</div>
+            </div>` : ''}
           </div>
         </div>
 
