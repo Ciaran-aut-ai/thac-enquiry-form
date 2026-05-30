@@ -394,19 +394,32 @@ function renderJob() {
         <!-- Progress Checklist -->
         <div class="card">
           <div class="card-title">Progress Checklist</div>
-          <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;flex-direction:column;">
             ${[
-              ['Axiscape Prepared', job.axi_prepared, job.axi_prepared_at],
-              ['Report Drafted', job.report_drafted, job.report_drafted_at],
-              ['Field Data Uploaded', job.field_data_uploaded, job.field_data_uploaded_at],
-              ['Report Finalised', job.report_finalised, job.report_finalised_at],
-            ].map(([label, done, at]) => `
-              <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
-                <span style="font-size:18px;">${done ? '✅' : '⬜'}</span>
-                <span style="font-size:13px;font-weight:${done ? '500' : '400'};color:${done ? 'var(--green-dark)' : 'var(--text-muted)'};">${label}</span>
-                ${at ? `<span style="margin-left:auto;font-size:11px;color:var(--text-muted);">${formatDate(at)}</span>` : ''}
-              </div>
-            `).join('')}
+              { label: 'Axiscape Prepared',   field: 'axi_prepared',       at: 'axi_prepared_at',       dispatch: null },
+              { label: 'Report Drafted',      field: 'report_drafted',      at: 'report_drafted_at',      dispatch: null },
+              { label: 'Field Data Uploaded', field: 'field_data_uploaded', at: 'field_data_uploaded_at', dispatch: 'yellow' },
+              { label: 'Report Finalised',    field: 'report_finalised',    at: 'report_finalised_at',    dispatch: 'green' },
+            ].map(item => {
+              const done = job[item.field];
+              const at   = job[item.at];
+              const hint = item.dispatch === 'yellow' ? ' — sets job to Attended 🟡'
+                         : item.dispatch === 'green'  ? ' — sets job to Report Sent 🟢'
+                         : '';
+              return `
+              <div onclick="toggleChecklist('${item.field}','${item.at}',${JSON.stringify(item.dispatch)})"
+                   style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;"
+                   class="hover-row">
+                <span style="font-size:20px;line-height:1;">${done ? '✅' : '⬜'}</span>
+                <div style="flex:1;">
+                  <div style="font-size:13px;font-weight:${done ? '600' : '400'};color:${done ? 'var(--green-dark)' : 'var(--text)'};">
+                    ${item.label}
+                  </div>
+                  ${!done && hint ? `<div style="font-size:11px;color:var(--text-muted);">${hint}</div>` : ''}
+                </div>
+                ${at ? `<span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${formatDate(at)}</span>` : ''}
+              </div>`;
+            }).join('')}
           </div>
         </div>
 
@@ -612,6 +625,47 @@ async function submitPaid() {
     Object.assign(job, updates);
     closePaidModal();
     showToast('Invoice marked as paid');
+    renderJob();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// PROGRESS CHECKLIST
+// ============================================================
+
+async function toggleChecklist(field, atField, advancesDispatchTo) {
+  const isDone = job[field];
+
+  // Confirm before un-ticking
+  if (isDone && !confirm(`Mark "${field.replace(/_/g,' ')}" as incomplete?`)) return;
+
+  const updates = {};
+  if (!isDone) {
+    updates[field]   = true;
+    updates[atField] = new Date().toISOString();
+    // Advance dispatch state only if job isn't already at or past that state
+    if (advancesDispatchTo) {
+      const order = { pending_approval: 0, red: 1, orange: 2, yellow: 3, green: 4, archived: 5 };
+      const current = order[job.dispatch_state] ?? 0;
+      const target  = order[advancesDispatchTo] ?? 0;
+      if (current < target) updates.dispatch_state = advancesDispatchTo;
+    }
+  } else {
+    updates[field]   = false;
+    updates[atField] = null;
+  }
+
+  try {
+    await dbUpdate('jobs', `id=eq.${jobId}`, updates);
+    Object.assign(job, updates);
+    if (!isDone && advancesDispatchTo && updates.dispatch_state) {
+      const labels = { yellow: '🟡 Attended', green: '🟢 Report Sent' };
+      showToast(`Saved — dispatch state advanced to ${labels[advancesDispatchTo]}`);
+    } else {
+      showToast(!isDone ? 'Marked complete' : 'Marked incomplete');
+    }
     renderJob();
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
