@@ -419,6 +419,7 @@ async function confirmConvert() {
       quoted_amount: amount ? parseFloat(amount) : null,
       agreed_amount: amount ? parseFloat(amount) : null,
       urgency_surcharge: urgency_surcharge || null,
+      estimated_tree_count: enquiry.tree_count_band || null,
       arranging_client_id: clientId,
       internal_notes: document.getElementById('cvtNotes').value.trim() || null,
     });
