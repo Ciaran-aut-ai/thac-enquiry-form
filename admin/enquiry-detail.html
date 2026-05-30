@@ -364,6 +364,11 @@ function openConvertModal() {
     if (opt.value === urgVal) { opt.selected = true; break; }
   }
 
+  // Pre-fill quoted amount from enquiry
+  if (enquiry.quoted_price) {
+    document.getElementById('cvtAmount').value = enquiry.quoted_price;
+  }
+
   document.getElementById('convertModal').style.display = 'flex';
 }
 
@@ -401,6 +406,9 @@ async function confirmConvert() {
 
     // Step 2 — Create job record
     const amount = document.getElementById('cvtAmount').value;
+    const surchargeMap = { '1day': 150, '3days': 50, '5days': 0, '10days': 0 };
+    const urgency_surcharge = surchargeMap[enquiry.deadline_tier] ?? null;
+
     const jobData = await dbInsert('jobs', {
       survey_type: document.getElementById('cvtSurveyType').value,
       site_postcode: postcode,
@@ -410,6 +418,7 @@ async function confirmConvert() {
       billing_mode: document.getElementById('cvtBilling').value,
       quoted_amount: amount ? parseFloat(amount) : null,
       agreed_amount: amount ? parseFloat(amount) : null,
+      urgency_surcharge: urgency_surcharge || null,
       arranging_client_id: clientId,
       internal_notes: document.getElementById('cvtNotes').value.trim() || null,
     });
