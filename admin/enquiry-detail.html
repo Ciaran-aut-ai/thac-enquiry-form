@@ -363,20 +363,37 @@ function renderEnquiry() {
           </div>
         </div>
 
-        ${(enquiry.billing_contact_name || enquiry.billing_contact_email || enquiry.client_site_access) ? `
+        ${enquiry.client_details_at ? `
         <!-- Client-submitted details (Step 2) -->
         <div class="card" style="border-left:3px solid var(--green-mid);">
-          <div class="card-title">Client-Submitted Details</div>
+          <div class="card-title">Client-Submitted Details
+            <span style="font-size:11px;font-weight:400;color:var(--text-muted);">via acceptance form</span>
+          </div>
           <div style="display:flex;flex-direction:column;gap:10px;">
+            ${enquiry.end_client_name ? `
+            <div class="detail-field">
+              <label>End Client</label>
+              <div class="field-value">${enquiry.end_client_name}${enquiry.end_client_email ? ` · ${enquiry.end_client_email}` : ''}</div>
+            </div>` : ''}
             ${enquiry.billing_contact_name ? `
             <div class="detail-field">
-              <label>Billing Contact</label>
-              <div class="field-value">${enquiry.billing_contact_name}</div>
+              <label>Invoice Contact</label>
+              <div class="field-value">${enquiry.billing_contact_name}${enquiry.billing_contact_email ? ` · ${enquiry.billing_contact_email}` : ''}</div>
             </div>` : ''}
-            ${enquiry.billing_contact_email ? `
+            ${enquiry.billing_address ? `
             <div class="detail-field">
-              <label>Billing Email</label>
-              <div class="field-value">${enquiry.billing_contact_email}</div>
+              <label>Invoice Address</label>
+              <div class="field-value" style="white-space:pre-wrap;">${enquiry.billing_address}</div>
+            </div>` : ''}
+            ${enquiry.report_addressee_name ? `
+            <div class="detail-field">
+              <label>Report Addressee</label>
+              <div class="field-value">${enquiry.report_addressee_name}</div>
+            </div>` : ''}
+            ${enquiry.report_addressee_address ? `
+            <div class="detail-field">
+              <label>Report Address</label>
+              <div class="field-value" style="white-space:pre-wrap;">${enquiry.report_addressee_address}</div>
             </div>` : ''}
             ${enquiry.client_site_access ? `
             <div class="detail-field">
@@ -594,9 +611,14 @@ async function confirmConvert() {
       sla_deadline,
       is_two_stage: document.getElementById('cvtTwoStage').checked,
       arranging_client_id: clientId,
-      billing_contact_name:  enquiry.billing_contact_name  || null,
-      billing_contact_email: enquiry.billing_contact_email || null,
-      site_access_notes:     enquiry.client_site_access    || null,
+      end_client_name:          enquiry.end_client_name          || null,
+      end_client_email:         enquiry.end_client_email         || null,
+      billing_contact_name:     enquiry.billing_contact_name     || null,
+      billing_contact_email:    enquiry.billing_contact_email    || null,
+      billing_address:          enquiry.billing_address          || null,
+      report_addressee_name:    enquiry.report_addressee_name    || null,
+      report_addressee_address: enquiry.report_addressee_address || null,
+      site_access_notes:        enquiry.client_site_access       || null,
       internal_notes: document.getElementById('cvtNotes').value.trim() || null,
     });
 

@@ -223,7 +223,7 @@ function showAcceptConfirm(enq) {
         <span class="detail-value" style="color:#1a3c2e;font-size:16px;">${price}</span>
       </div>
     </div>
-    <button class="btn btn-accept" onclick="acceptQuote('${enq.id}', '${enq.job_number || ''}')">
+    <button class="btn btn-accept" onclick="acceptQuote('${enq.id}', '${enq.job_number || ''}', '${(enq.contact_name||'').replace(/'/g,"\\'")}')">
       ✅ Accept Quote
     </button>
     <button class="btn btn-decline" onclick="window.location.search='?id=${enq.id}&action=decline'">
@@ -253,7 +253,7 @@ function showDeclineConfirm(enq) {
   `;
 }
 
-async function acceptQuote(enquiryId, ref) {
+async function acceptQuote(enquiryId, ref, contactName) {
   const btn = document.querySelector('.btn-accept');
   btn.textContent = 'Confirming…';
   btn.disabled = true;
@@ -261,7 +261,7 @@ async function acceptQuote(enquiryId, ref) {
     await supabasePatch('enquiries', `id=eq.${enquiryId}`,
       { status: 'accepted', accepted_at: new Date().toISOString() }
     );
-    showStep2(enquiryId, ref);
+    showStep2(enquiryId, ref, contactName);
   } catch (e) {
     btn.textContent = '✅ Accept Quote';
     btn.disabled = false;
@@ -269,40 +269,66 @@ async function acceptQuote(enquiryId, ref) {
   }
 }
 
-function showStep2(enquiryId, ref) {
+const FIELD_STYLE = 'width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box;';
+const LABEL_STYLE = 'display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px;';
+const HINT_STYLE  = 'font-weight:400;color:#9ca3af;';
+const SEC_STYLE   = 'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:20px;margin:20px 0 14px;';
+
+function field(id, label, hint, type='text', placeholder='', rows=0, extraStyle='') {
+  const inp = rows
+    ? `<textarea id="${id}" rows="${rows}" placeholder="${placeholder}" style="${FIELD_STYLE}resize:vertical;${extraStyle}"></textarea>`
+    : `<input id="${id}" type="${type}" placeholder="${placeholder}" style="${FIELD_STYLE}${extraStyle}">`;
+  return `
+    <div style="margin-bottom:14px;">
+      <label style="${LABEL_STYLE}">${label}${hint ? ` <span style="${HINT_STYLE}">${hint}</span>` : ''}</label>
+      ${inp}
+    </div>`;
+}
+
+function showStep2(enquiryId, ref, contactName) {
   document.getElementById('card').innerHTML = `
     <div class="logo">🌳</div>
     <div class="brand">Trevor Heaps Arboricultural Consultancy Ltd.</div>
     <div class="icon">✅</div>
     <h1>Quote Accepted!</h1>
-    <p class="sub">One more step — please provide a few details so we can get started quickly.</p>
-    <div class="ref">${ref || 'Quote accepted'}</div>
+    <p class="sub" style="margin-bottom:8px;">One more step — a few details so we can get started quickly.</p>
+    <div class="ref" style="margin-bottom:20px;">${ref || 'Quote accepted'}</div>
 
     <div style="text-align:left;">
-      <div style="margin-bottom:16px;">
-        <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px;">
-          Billing contact name
-          <span style="font-weight:400;color:#9ca3af;">(if different from yourself)</span>
-        </label>
-        <input id="billName" type="text" placeholder="e.g. Accounts Department"
-          style="width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;">
+
+      <!-- Section 1: Who is paying? -->
+      <div style="${SEC_STYLE}margin-top:0;border-top:none;padding-top:0;">1. Invoice details</div>
+      <p style="font-size:13px;color:#6b7280;margin-bottom:14px;">Who should receive the invoice for this work?</p>
+      ${field('billName',    'Invoice contact name', '(name on the invoice)', 'text', 'e.g. Sarah Jones or Accounts Dept')}
+      ${field('billEmail',   'Invoice email address', '(invoices sent here)', 'email', 'accounts@example.com')}
+      ${field('billAddress', 'Invoice postal address', '(for formal invoice)', 'text', '12 High Street, Bournemouth, BH1 1AA', 2)}
+
+      <!-- Section 2: Are you the end client? -->
+      <div style="${SEC_STYLE}">2. About the client</div>
+      <p style="font-size:13px;color:#6b7280;margin-bottom:14px;">Are you the property owner / developer, or are you arranging this on behalf of someone else?</p>
+      <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;font-size:14px;">
+        <input type="radio" name="clientRole" value="self" onchange="toggleEndClient('self')" checked>
+        I am the end client (property owner / developer)
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;margin-bottom:16px;cursor:pointer;font-size:14px;">
+        <input type="radio" name="clientRole" value="other" onchange="toggleEndClient('other')">
+        I am arranging this on behalf of someone else
+      </label>
+      <div id="endClientFields" style="display:none;background:#f9fafb;border-radius:8px;padding:14px;margin-bottom:4px;">
+        ${field('endClientName',  'End client name',  '', 'text', 'e.g. Mr & Mrs Smith')}
+        ${field('endClientEmail', 'End client email', '(optional)', 'email', 'client@example.com')}
       </div>
-      <div style="margin-bottom:16px;">
-        <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px;">
-          Billing email address
-          <span style="font-weight:400;color:#9ca3af;">(invoices will be sent here)</span>
-        </label>
-        <input id="billEmail" type="email" placeholder="accounts@yourcompany.com"
-          style="width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;">
-      </div>
-      <div style="margin-bottom:24px;">
-        <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px;">
-          Site access notes
-          <span style="font-weight:400;color:#9ca3af;">(gate codes, parking, who to contact on site)</span>
-        </label>
-        <textarea id="siteAccess" rows="3" placeholder="e.g. Gate code 1234, park on the drive, ask for John"
-          style="width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;"></textarea>
-      </div>
+
+      <!-- Section 3: Report cover page -->
+      <div style="${SEC_STYLE}">3. Report addressee</div>
+      <p style="font-size:13px;color:#6b7280;margin-bottom:14px;">Name and address that will appear on the front of the arboricultural report. Defaults to the end client details above if left blank.</p>
+      ${field('reportName',    'Name on report',    '(optional — defaults to end client)', 'text', 'e.g. Mr & Mrs Smith')}
+      ${field('reportAddress', 'Address on report', '(optional)', 'text', '12 High Street, Bournemouth, BH1 1AA', 2)}
+
+      <!-- Section 4: Site access -->
+      <div style="${SEC_STYLE}">4. Site access</div>
+      ${field('siteAccess', 'Access notes', '(gate codes, parking, contact on site)', 'text', 'e.g. Gate code 1234, park on the drive, call John on arrival', 2)}
+
     </div>
 
     <button class="btn btn-accept" onclick="submitStep2('${enquiryId}', '${ref}')">
@@ -315,16 +341,36 @@ function showStep2(enquiryId, ref) {
   `;
 }
 
+function toggleEndClient(val) {
+  document.getElementById('endClientFields').style.display = val === 'other' ? 'block' : 'none';
+}
+
 async function submitStep2(enquiryId, ref) {
   const btn = document.querySelector('.btn-accept');
   btn.textContent = 'Saving…';
   btn.disabled = true;
+
+  const endClientName  = document.getElementById('endClientName')?.value.trim()  || null;
+  const endClientEmail = document.getElementById('endClientEmail')?.value.trim() || null;
+  const billAddress    = document.getElementById('billAddress').value.trim()      || null;
+  const reportName     = document.getElementById('reportName').value.trim()       || null;
+  const reportAddress  = document.getElementById('reportAddress').value.trim()    || null;
+
+  // Report addressee defaults to end client → billing if not provided
+  const finalReportName    = reportName    || endClientName    || null;
+  const finalReportAddress = reportAddress || billAddress      || null;
+
   try {
     await supabasePatch('enquiries', `id=eq.${enquiryId}`, {
-      billing_contact_name:  document.getElementById('billName').value.trim() || null,
-      billing_contact_email: document.getElementById('billEmail').value.trim() || null,
-      client_site_access:    document.getElementById('siteAccess').value.trim() || null,
-      client_details_at:     new Date().toISOString(),
+      billing_contact_name:     document.getElementById('billName').value.trim()  || null,
+      billing_contact_email:    document.getElementById('billEmail').value.trim() || null,
+      billing_address:          billAddress,
+      end_client_name:          endClientName,
+      end_client_email:         endClientEmail,
+      report_addressee_name:    finalReportName,
+      report_addressee_address: finalReportAddress,
+      client_site_access:       document.getElementById('siteAccess').value.trim() || null,
+      client_details_at:        new Date().toISOString(),
     });
     showDone('🎉', 'All Done!',
       `Thank you — we have everything we need. Trevor will be in touch shortly to confirm your survey date.`,
