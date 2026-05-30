@@ -363,6 +363,29 @@ function renderEnquiry() {
           </div>
         </div>
 
+        ${(enquiry.billing_contact_name || enquiry.billing_contact_email || enquiry.client_site_access) ? `
+        <!-- Client-submitted details (Step 2) -->
+        <div class="card" style="border-left:3px solid var(--green-mid);">
+          <div class="card-title">Client-Submitted Details</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${enquiry.billing_contact_name ? `
+            <div class="detail-field">
+              <label>Billing Contact</label>
+              <div class="field-value">${enquiry.billing_contact_name}</div>
+            </div>` : ''}
+            ${enquiry.billing_contact_email ? `
+            <div class="detail-field">
+              <label>Billing Email</label>
+              <div class="field-value">${enquiry.billing_contact_email}</div>
+            </div>` : ''}
+            ${enquiry.client_site_access ? `
+            <div class="detail-field">
+              <label>Site Access</label>
+              <div class="field-value" style="white-space:pre-wrap;">${enquiry.client_site_access}</div>
+            </div>` : ''}
+          </div>
+        </div>` : ''}
+
       </div>
     </div>
   `;
@@ -501,6 +524,16 @@ function openConvertModal() {
     document.getElementById('cvtAmount').value = enquiry.quoted_price;
   }
 
+  // Pre-fill billing contact + site access from client Step 2 submission
+  if (enquiry.billing_contact_name || enquiry.billing_contact_email) {
+    const noteLines = [];
+    if (enquiry.billing_contact_name)  noteLines.push(`Billing: ${enquiry.billing_contact_name}`);
+    if (enquiry.billing_contact_email) noteLines.push(`Billing email: ${enquiry.billing_contact_email}`);
+    if (enquiry.client_site_access)    noteLines.push(`Site access: ${enquiry.client_site_access}`);
+    const notesEl = document.getElementById('cvtNotes');
+    if (!notesEl.value) notesEl.value = noteLines.join('\n');
+  }
+
   // Auto-switch billing to staged when two-stage is ticked
   document.getElementById('cvtTwoStage').onchange = function() {
     if (this.checked) document.getElementById('cvtBilling').value = 'staged';
@@ -561,6 +594,9 @@ async function confirmConvert() {
       sla_deadline,
       is_two_stage: document.getElementById('cvtTwoStage').checked,
       arranging_client_id: clientId,
+      billing_contact_name:  enquiry.billing_contact_name  || null,
+      billing_contact_email: enquiry.billing_contact_email || null,
+      site_access_notes:     enquiry.client_site_access    || null,
       internal_notes: document.getElementById('cvtNotes').value.trim() || null,
     });
 

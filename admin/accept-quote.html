@@ -261,15 +261,87 @@ async function acceptQuote(enquiryId, ref) {
     await supabasePatch('enquiries', `id=eq.${enquiryId}`,
       { status: 'accepted', accepted_at: new Date().toISOString() }
     );
-    showDone('✅', 'Quote Accepted!',
-      `Thank you! We've received your acceptance for ${ref || 'your quote'}. Trevor will be in touch shortly to arrange the survey.`,
-      { job_number: ref }
-    );
+    showStep2(enquiryId, ref);
   } catch (e) {
     btn.textContent = '✅ Accept Quote';
     btn.disabled = false;
     alert('Something went wrong — please try again or contact us directly.');
   }
+}
+
+function showStep2(enquiryId, ref) {
+  document.getElementById('card').innerHTML = `
+    <div class="logo">🌳</div>
+    <div class="brand">Trevor Heaps Arboricultural Consultancy Ltd.</div>
+    <div class="icon">✅</div>
+    <h1>Quote Accepted!</h1>
+    <p class="sub">One more step — please provide a few details so we can get started quickly.</p>
+    <div class="ref">${ref || 'Quote accepted'}</div>
+
+    <div style="text-align:left;">
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px;">
+          Billing contact name
+          <span style="font-weight:400;color:#9ca3af;">(if different from yourself)</span>
+        </label>
+        <input id="billName" type="text" placeholder="e.g. Accounts Department"
+          style="width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;">
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px;">
+          Billing email address
+          <span style="font-weight:400;color:#9ca3af;">(invoices will be sent here)</span>
+        </label>
+        <input id="billEmail" type="email" placeholder="accounts@yourcompany.com"
+          style="width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;">
+      </div>
+      <div style="margin-bottom:24px;">
+        <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px;">
+          Site access notes
+          <span style="font-weight:400;color:#9ca3af;">(gate codes, parking, who to contact on site)</span>
+        </label>
+        <textarea id="siteAccess" rows="3" placeholder="e.g. Gate code 1234, park on the drive, ask for John"
+          style="width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;"></textarea>
+      </div>
+    </div>
+
+    <button class="btn btn-accept" onclick="submitStep2('${enquiryId}', '${ref}')">
+      Submit Details →
+    </button>
+    <button class="btn btn-decline" onclick="skipStep2('${enquiryId}', '${ref}')">
+      Skip — I'll provide these later
+    </button>
+    <div class="footer">This information is stored securely and only used to arrange your survey.</div>
+  `;
+}
+
+async function submitStep2(enquiryId, ref) {
+  const btn = document.querySelector('.btn-accept');
+  btn.textContent = 'Saving…';
+  btn.disabled = true;
+  try {
+    await supabasePatch('enquiries', `id=eq.${enquiryId}`, {
+      billing_contact_name:  document.getElementById('billName').value.trim() || null,
+      billing_contact_email: document.getElementById('billEmail').value.trim() || null,
+      client_site_access:    document.getElementById('siteAccess').value.trim() || null,
+      client_details_at:     new Date().toISOString(),
+    });
+    showDone('🎉', 'All Done!',
+      `Thank you — we have everything we need. Trevor will be in touch shortly to confirm your survey date.`,
+      { job_number: ref }
+    );
+  } catch (e) {
+    btn.textContent = 'Submit Details →';
+    btn.disabled = false;
+    alert('Something went wrong — please try again or contact us directly.');
+  }
+}
+
+function skipStep2(enquiryId, ref) {
+  showDone('✅', 'Quote Accepted!',
+    `Thank you! Trevor will be in touch shortly to arrange the survey and confirm the details.`,
+    { job_number: ref }
+  );
 }
 
 async function declineQuote(enquiryId) {
