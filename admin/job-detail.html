@@ -504,6 +504,62 @@ function renderJob() {
           </div>
         </div>
 
+        <!-- Documents -->
+        <div class="card">
+          <div class="card-title">
+            Documents
+            <button class="btn btn-secondary btn-sm" id="editDocsBtn" onclick="toggleDocsEditor()">
+              ${(job.doc_block_plan_url || job.doc_topo_survey_url || job.doc_other_urls) ? 'Edit' : 'Add links'}
+            </button>
+          </div>
+          <div id="docsDisplay">
+            ${(job.doc_block_plan_url || job.doc_topo_survey_url || job.doc_other_urls || job.topo_survey_provided) ? `
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+                  <span>${job.topo_survey_provided ? '✅' : '⬜'}</span>
+                  <span style="color:${job.topo_survey_provided ? 'var(--green-dark)' : 'var(--text-muted)'};">Topo survey provided</span>
+                </div>
+                ${job.doc_block_plan_url ? `
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:12px;color:var(--text-muted);width:90px;flex-shrink:0;">Block Plan</span>
+                  <a href="${job.doc_block_plan_url}" target="_blank" class="btn btn-secondary btn-sm">📄 Open →</a>
+                </div>` : '<div style="font-size:12px;color:var(--text-muted);">Block plan: not yet uploaded</div>'}
+                ${job.doc_topo_survey_url ? `
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:12px;color:var(--text-muted);width:90px;flex-shrink:0;">Topo Survey</span>
+                  <a href="${job.doc_topo_survey_url}" target="_blank" class="btn btn-secondary btn-sm">📄 Open →</a>
+                </div>` : ''}
+                ${job.doc_other_urls ? `
+                <div style="font-size:13px;line-height:1.6;color:var(--text-muted);">${job.doc_other_urls}</div>` : ''}
+              </div>
+            ` : `<div style="font-size:13px;color:var(--text-muted);">No documents yet — paste Google Drive sharing links once client submits plans.</div>`}
+          </div>
+          <div id="docsEditor" style="display:none;margin-top:8px;">
+            <div class="form-group">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;">
+                <input type="checkbox" id="topoProvided" ${job.topo_survey_provided ? 'checked' : ''}>
+                Topo survey provided by client
+              </label>
+            </div>
+            <div class="form-group">
+              <label>Block Plan (Google Drive link) <span style="color:#dc2626;font-size:11px;">required</span></label>
+              <input type="url" class="form-control" id="docBlockPlan" value="${job.doc_block_plan_url || ''}" placeholder="https://drive.google.com/...">
+            </div>
+            <div class="form-group">
+              <label>Topo Survey (Google Drive link)</label>
+              <input type="url" class="form-control" id="docTopoSurvey" value="${job.doc_topo_survey_url || ''}" placeholder="https://drive.google.com/...">
+            </div>
+            <div class="form-group">
+              <label>Other Documents / Notes</label>
+              <textarea class="form-control" id="docOther" rows="2" placeholder="Any other document links or notes...">${job.doc_other_urls || ''}</textarea>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-secondary" onclick="toggleDocsEditor()">Cancel</button>
+              <button class="btn btn-primary" onclick="saveDocs()">Save</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Internal Notes (always shown) -->
         <div class="card">
           <div class="card-title">
@@ -1023,6 +1079,37 @@ async function saveAccessNotes() {
     job.site_access_notes = text || null;
     job.site_location_tag = tag  || null;
     showToast('Site access details saved');
+    renderJob();
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+// ============================================================
+// DOCUMENTS
+// ============================================================
+
+function toggleDocsEditor() {
+  const display = document.getElementById('docsDisplay');
+  const editor  = document.getElementById('docsEditor');
+  const btn     = document.getElementById('editDocsBtn');
+  const isEditing = editor.style.display !== 'none';
+  display.style.display = isEditing ? '' : 'none';
+  editor.style.display  = isEditing ? 'none' : '';
+  btn.textContent = isEditing
+    ? ((job.doc_block_plan_url || job.doc_topo_survey_url || job.doc_other_urls) ? 'Edit' : 'Add links')
+    : 'Cancel';
+}
+
+async function saveDocs() {
+  const updates = {
+    topo_survey_provided: document.getElementById('topoProvided').checked,
+    doc_block_plan_url:   document.getElementById('docBlockPlan').value.trim() || null,
+    doc_topo_survey_url:  document.getElementById('docTopoSurvey').value.trim() || null,
+    doc_other_urls:       document.getElementById('docOther').value.trim() || null,
+  };
+  try {
+    await dbUpdate('jobs', `id=eq.${jobId}`, updates);
+    Object.assign(job, updates);
+    showToast('Documents saved');
     renderJob();
   } catch (e) { showToast('Error: ' + e.message, 'error'); }
 }

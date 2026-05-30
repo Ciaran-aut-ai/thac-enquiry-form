@@ -21,9 +21,14 @@ async function init() {
     <div class="main-content">
       <div class="topbar">
         <div class="topbar-title">Dashboard</div>
-        <div class="topbar-search">
+        <div class="topbar-search" style="position:relative;">
           <span>🔍</span>
-          <input type="text" placeholder="Search jobs, clients, enquiries..." id="globalSearch">
+          <input type="text" placeholder="Search jobs, clients, enquiries..." id="globalSearch"
+            oninput="handleGlobalSearch(this.value)" autocomplete="off">
+          <div id="searchResults" style="display:none;position:absolute;top:100%;left:0;right:0;
+            background:white;border:1px solid var(--border);border-radius:10px;
+            box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:200;max-height:360px;overflow-y:auto;margin-top:4px;">
+          </div>
         </div>
         <span style="font-size:13px;color:var(--text-muted)">${new Date().toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long', year:'numeric'})}</span>
       </div>
@@ -247,6 +252,100 @@ async function loadRecentEnquiries() {
     document.getElementById('recentEnquiries').innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
   }
 }
+
+// ============================================================
+// GLOBAL SEARCH
+// ============================================================
+
+let _searchTimer = null;
+
+function handleGlobalSearch(q) {
+  clearTimeout(_searchTimer);
+  const box = document.getElementById('searchResults');
+  if (!q || q.trim().length < 2) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<div style="padding:12px 16px;font-size:13px;color:var(--text-muted);">Searching…</div>';
+  _searchTimer = setTimeout(() => runGlobalSearch(q.trim()), 300);
+}
+
+async function runGlobalSearch(q) {
+  const box = document.getElementById('searchResults');
+  try {
+    const [jobs, enquiries, clients] = await Promise.all([
+      dbGet('jobs', {
+        'select': 'id,reference,survey_type,site_postcode,dispatch_state',
+        'or': `reference.ilike.*${q}*,site_postcode.ilike.*${q}*`,
+        'limit': 5
+      }),
+      dbGet('enquiries', {
+        'select': 'id,job_number,contact_name,survey_type,status',
+        'or': `job_number.ilike.*${q}*,contact_name.ilike.*${q}*,contact_email.ilike.*${q}*`,
+        'limit': 5
+      }),
+      dbGet('clients', {
+        'select': 'id,full_name,company_name,email',
+        'or': `full_name.ilike.*${q}*,company_name.ilike.*${q}*,email.ilike.*${q}*`,
+        'limit': 5
+      }),
+    ]);
+
+    const sections = [];
+
+    if (jobs?.length) {
+      sections.push(`<div style="padding:8px 16px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Jobs</div>`);
+      jobs.forEach(j => {
+        sections.push(`<a href="job-detail.html?id=${j.id}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;text-decoration:none;color:var(--text);" class="hover-row">
+          <span style="font-size:16px;">💼</span>
+          <div>
+            <div style="font-weight:600;font-size:13px;">${j.reference || '—'}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${getSurveyLabel(j.survey_type)} · ${j.site_postcode || '—'}</div>
+          </div>
+        </a>`);
+      });
+    }
+
+    if (enquiries?.length) {
+      sections.push(`<div style="padding:8px 16px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-top:1px solid var(--border);">Enquiries</div>`);
+      enquiries.forEach(e => {
+        sections.push(`<a href="enquiry-detail.html?id=${e.id}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;text-decoration:none;color:var(--text);" class="hover-row">
+          <span style="font-size:16px;">📥</span>
+          <div>
+            <div style="font-weight:600;font-size:13px;">${e.contact_name || e.job_number || '—'}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${e.job_number || 'Pending'} · ${getSurveyLabel(e.survey_type)}</div>
+          </div>
+        </a>`);
+      });
+    }
+
+    if (clients?.length) {
+      sections.push(`<div style="padding:8px 16px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-top:1px solid var(--border);">Clients</div>`);
+      clients.forEach(c => {
+        sections.push(`<a href="client-detail.html?id=${c.id}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;text-decoration:none;color:var(--text);" class="hover-row">
+          <span style="font-size:16px;">👤</span>
+          <div>
+            <div style="font-weight:600;font-size:13px;">${c.company_name || c.full_name || '—'}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${c.email || ''}</div>
+          </div>
+        </a>`);
+      });
+    }
+
+    if (!sections.length) {
+      box.innerHTML = `<div style="padding:16px;font-size:13px;color:var(--text-muted);text-align:center;">No results for "${q}"</div>`;
+    } else {
+      box.innerHTML = sections.join('');
+    }
+  } catch (e) {
+    box.innerHTML = `<div style="padding:12px 16px;font-size:13px;color:var(--text-muted);">Error: ${e.message}</div>`;
+  }
+}
+
+// Close search results when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.topbar-search')) {
+    document.getElementById('searchResults').style.display = 'none';
+  }
+});
 
 init();
 </script>
