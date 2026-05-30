@@ -136,7 +136,7 @@ CREATE OR REPLACE FUNCTION trigger_notify_surveyor_claimed()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF OLD.dispatch_state IS DISTINCT FROM NEW.dispatch_state
-     AND NEW.dispatch_state = 'claimed' THEN
+     AND NEW.dispatch_state = 'orange' THEN
     PERFORM supabase_functions.http_request(
       'https://lemppaqgpntadeylzzwn.supabase.co/functions/v1/notify-surveyor-claimed',
       'POST',
