@@ -17,7 +17,12 @@ requireAuth();
 
 let allJobs = [];
 let activeFilter = 'all';
+let activeUrgency = 'all';
 let searchQuery = '';
+
+// Read urgency param from dashboard stat card links
+const _urlParams = new URLSearchParams(window.location.search);
+if (_urlParams.get('urgency')) activeUrgency = _urlParams.get('urgency');
 
 async function init() {
   document.getElementById('app').innerHTML = `
@@ -37,13 +42,21 @@ async function init() {
             <span style="font-size:13px;font-weight:400;color:var(--text-muted)" id="jobCount"></span>
           </div>
           <div class="filter-bar">
-            <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
-            <button class="filter-btn" onclick="setFilter('pending_approval', this)">⏳ Pending</button>
-            <button class="filter-btn" onclick="setFilter('red', this)">🔴 Unallocated</button>
-            <button class="filter-btn" onclick="setFilter('orange', this)">🟠 Claimed</button>
-            <button class="filter-btn" onclick="setFilter('yellow', this)">🟡 Attended</button>
-            <button class="filter-btn" onclick="setFilter('green', this)">🟢 Report Sent</button>
-            <button class="filter-btn" onclick="setFilter('archived', this)">📦 Archived</button>
+            <button class="filter-btn ${activeFilter==='all'?'active':''}" onclick="setFilter('all',this)">All</button>
+            <button class="filter-btn ${activeFilter==='pending_approval'?'active':''}" onclick="setFilter('pending_approval',this)">⏳ Pending</button>
+            <button class="filter-btn ${activeFilter==='red'?'active':''}" onclick="setFilter('red',this)">🔴 Unallocated</button>
+            <button class="filter-btn ${activeFilter==='orange'?'active':''}" onclick="setFilter('orange',this)">🟠 Claimed</button>
+            <button class="filter-btn ${activeFilter==='yellow'?'active':''}" onclick="setFilter('yellow',this)">🟡 Attended</button>
+            <button class="filter-btn ${activeFilter==='green'?'active':''}" onclick="setFilter('green',this)">🟢 Report Sent</button>
+            <button class="filter-btn ${activeFilter==='archived'?'active':''}" onclick="setFilter('archived',this)">📦 Archived</button>
+          </div>
+          <div class="filter-bar" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;">
+            <span style="font-size:12px;color:var(--text-muted);padding:4px 2px;">Urgency:</span>
+            <button class="filter-btn ${activeUrgency==='all'?'active':''}" onclick="setUrgency('all',this)">All</button>
+            <button class="filter-btn ${activeUrgency==='red'?'active':''}" onclick="setUrgency('red',this)">🔴 Urgent</button>
+            <button class="filter-btn ${activeUrgency==='orange'?'active':''}" onclick="setUrgency('orange',this)">🟠 Elevated</button>
+            <button class="filter-btn ${activeUrgency==='yellow'?'active':''}" onclick="setUrgency('yellow',this)">🟡 Standard</button>
+            <button class="filter-btn ${activeUrgency==='grey'?'active':''}" onclick="setUrgency('grey',this)">⚫ Low</button>
           </div>
           <div id="jobsTable"><div class="loading"><div class="spinner"></div><br>Loading jobs...</div></div>
         </div>
@@ -106,6 +119,10 @@ function renderTable() {
     filtered = filtered.filter(j => !j.is_archived);
   }
 
+  if (activeUrgency !== 'all') {
+    filtered = filtered.filter(j => j.urgency_state === activeUrgency);
+  }
+
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
     filtered = filtered.filter(j =>
@@ -160,7 +177,15 @@ function renderTable() {
 
 function setFilter(filter, btn) {
   activeFilter = filter;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  // Only reset active state on dispatch filter buttons (first filter-bar)
+  document.querySelectorAll('.filter-bar:first-of-type .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable();
+}
+
+function setUrgency(urgency, btn) {
+  activeUrgency = urgency;
+  document.querySelectorAll('.filter-bar:last-of-type .filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderTable();
 }

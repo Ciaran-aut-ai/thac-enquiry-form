@@ -361,11 +361,22 @@ function openConvertModal() {
   document.getElementById('cvtCompany').value = enquiry.company || '';
   document.getElementById('cvtPostcode').value = enquiry.site_postcode || '';
 
-  // Set survey type
+  // Map enquiry form survey type keys → admin CRM keys
+  const surveyTypeMap = {
+    planning_stage1:  'bs5837',
+    planning_stage2:  'bc',
+    health_safety:    'vta',
+    insurer_mortgage: 'mortgage',
+    subsidence:       'subs',
+    nhbc:             'other',
+    site_visit:       'other',
+    resistograph:     'other',
+  };
+  const mappedType = surveyTypeMap[enquiry.survey_type] || enquiry.survey_type || '';
   const st = document.getElementById('cvtSurveyType');
-  if (enquiry.survey_type) {
+  if (mappedType) {
     for (let opt of st.options) {
-      if (opt.value === enquiry.survey_type) { opt.selected = true; break; }
+      if (opt.value === mappedType) { opt.selected = true; break; }
     }
   }
 

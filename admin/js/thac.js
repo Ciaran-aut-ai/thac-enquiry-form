@@ -88,18 +88,28 @@ function getUrgencyRowClass(deadlineTier) {
 // ============================================================
 
 const SURVEY_TYPE_LABELS = {
-  bs5837:     'BS5837 Tree Survey',
-  vta:        'Visual Tree Assessment',
-  bc:         'BS5837 Stage 2 (AIA/AMS/TPP)',
-  subs:       'Subsidence / Building Damage',
-  ams:        'Arboricultural Method Statement',
-  tpp:        'Tree Protection Plan',
-  tpo:        'TPO Application',
-  lscp:       'Landscaping Plans',
-  mortgage:   'Mortgage / Insurer Report',
-  supervision:'Site Supervision',
-  amendment:  'Amendment',
-  other:      'Other'
+  // Admin CRM keys
+  bs5837:      'BS5837 Tree Survey (Planning)',
+  vta:         'Visual Tree Assessment',
+  bc:          'BS5837 Stage 2 (AIA/AMS/TPP)',
+  subs:        'Subsidence / Building Damage',
+  ams:         'Arboricultural Method Statement',
+  tpp:         'Tree Protection Plan',
+  tpo:         'TPO Application',
+  lscp:        'Landscaping Plans',
+  mortgage:    'Mortgage / Insurer Report',
+  supervision: 'Site Supervision',
+  amendment:   'Amendment',
+  other:       'Other',
+  // Enquiry form keys
+  planning_stage1:  'Planning — Stage 1 (BS5837)',
+  planning_stage2:  'Planning — Stage 2 (AIA/AMS/TPP)',
+  health_safety:    'Tree Condition / Risk Survey',
+  insurer_mortgage: 'Insurer / Mortgage Lender',
+  subsidence:       'Building Damage / Subsidence',
+  nhbc:             'Foundation Depths (NHBC)',
+  site_visit:       'Site Visit & Advice',
+  resistograph:     'Resistograph Testing',
 };
 
 function getSurveyLabel(type) {

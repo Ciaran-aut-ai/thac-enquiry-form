@@ -31,22 +31,22 @@ async function init() {
 
         <!-- Stat Cards -->
         <div class="stat-grid" id="statGrid">
-          <div class="stat-card urgent">
+          <div class="stat-card urgent" onclick="window.location.href='jobs.html?urgency=red'" style="cursor:pointer;">
             <div class="stat-label">🔴 Urgent Jobs</div>
             <div class="stat-value" id="statUrgent">—</div>
             <div class="stat-sub">Due within 1 working day</div>
           </div>
-          <div class="stat-card elevated">
+          <div class="stat-card elevated" onclick="window.location.href='jobs.html?urgency=orange'" style="cursor:pointer;">
             <div class="stat-label">🟠 Elevated Jobs</div>
             <div class="stat-value" id="statElevated">—</div>
             <div class="stat-sub">Due within 3 working days</div>
           </div>
-          <div class="stat-card standard">
+          <div class="stat-card standard" onclick="window.location.href='jobs.html?urgency=yellow'" style="cursor:pointer;">
             <div class="stat-label">🟡 Standard Jobs</div>
             <div class="stat-value" id="statStandard">—</div>
             <div class="stat-sub">Due within 5 working days</div>
           </div>
-          <div class="stat-card complete">
+          <div class="stat-card complete" onclick="window.location.href='jobs.html?urgency=grey'" style="cursor:pointer;">
             <div class="stat-label">⚫ Low Priority Jobs</div>
             <div class="stat-value" id="statLow">—</div>
             <div class="stat-sub">10+ working days</div>
