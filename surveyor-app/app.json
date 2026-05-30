@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "THAC Surveyor",
+    "slug": "thac-surveyor",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a3c2e"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.thac.surveyor",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Used to show nearby available jobs on the map.",
+        "NSLocationAlwaysUsageDescription": "Used to show nearby available jobs on the map."
+      }
+    },
+    "android": {
+      "package": "com.thac.surveyor",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a3c2e"
+      },
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "plugins": [
+      ["expo-location", { "locationAlwaysAndWhenInUsePermission": "Allow THAC Surveyor to use your location to show nearby jobs." }]
+    ]
+  }
+}

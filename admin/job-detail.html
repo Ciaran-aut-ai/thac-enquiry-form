@@ -1030,7 +1030,15 @@ function renderDispatchButton() {
     </button>`;
   }
   if (d === 'archived') return '';
-  // Claimed / Attended / Report Sent — dispatched, no action needed here
+  if (d === 'orange') {
+    return `
+      <button class="btn btn-secondary w-100" style="justify-content:center;" disabled>
+        🟠 Claimed by Surveyor
+      </button>
+      <button class="btn btn-secondary w-100" style="justify-content:center;color:#dc2626;margin-top:6px;" onclick="handBackJob()">
+        ↩ Unassign Surveyor
+      </button>`;
+  }
   return `<button class="btn btn-secondary w-100" style="justify-content:center;" disabled>
     📍 Dispatched
   </button>`;
@@ -1046,6 +1054,24 @@ async function approveToMap() {
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
   }
+}
+
+async function handBackJob() {
+  const note = prompt('Reason for handing back (optional):') ?? '';
+  if (note === null) return; // cancelled
+  if (!confirm('Unassign the surveyor and return this job to the map as available?')) return;
+  try {
+    await dbUpdate('jobs', `id=eq.${jobId}`, {
+      surveyor_id:      null,
+      dispatch_state:   'red',
+      claimed_at:       null,
+      handed_back_at:   new Date().toISOString(),
+      handed_back_note: note.trim() || null,
+    });
+    Object.assign(job, { surveyor_id: null, dispatch_state: 'red', claimed_at: null });
+    showToast('Surveyor unassigned — job back on map');
+    renderJob();
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
 }
 
 // ============================================================
