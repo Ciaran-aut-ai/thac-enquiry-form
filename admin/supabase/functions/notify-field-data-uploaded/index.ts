@@ -8,28 +8,21 @@
 // ============================================================
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { sendEmail, emailWrapper, urgencyBadge, ADMIN_EMAIL } from '../_shared/email-templates.ts';
+import { sendEmail, emailWrapper, urgencyStateBadge, SURVEY_LABELS, ADMIN_EMAIL } from '../_shared/email-templates.ts';
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_THAC_SERVICE_ROLE_KEY')!;
 
 async function getSurveyorName(surveyorId: string): Promise<string> {
-  if (!surveyorId) return 'Unknown Surveyor';
+  if (!surveyorId) return 'Unassigned';
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/surveyors?id=eq.${surveyorId}&select=user_id,users(full_name,email)`,
-      {
-        headers: {
-          'apikey': SUPABASE_SERVICE_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-        }
-      }
+      `${SUPABASE_URL}/rest/v1/surveyors?id=eq.${surveyorId}&select=full_name`,
+      { headers: { 'apikey': SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}` } }
     );
     const data = await res.json();
-    return data?.[0]?.users?.full_name || data?.[0]?.users?.email || 'Unknown Surveyor';
-  } catch {
-    return 'Unknown Surveyor';
-  }
+    return data?.[0]?.full_name || 'Unknown Surveyor';
+  } catch { return 'Unknown Surveyor'; }
 }
 
 serve(async (req) => {
@@ -43,7 +36,7 @@ serve(async (req) => {
       return new Response('Not a field-data-upload transition', { status: 200 });
     }
 
-    const surveyorName = await getSurveyorName(record.assigned_surveyor_id);
+    const surveyorName = await getSurveyorName(record.surveyor_id);
     const subject = `🟡 Field Data Ready — ${record.reference} | Finalise Report Now`;
 
     const uploadedAt = record.field_data_uploaded_at
@@ -80,7 +73,7 @@ serve(async (req) => {
         </div>
         <div class="detail-row">
           <span class="detail-label">Survey Type</span>
-          <span class="detail-value">${record.survey_type || '—'}</span>
+          <span class="detail-value">${SURVEY_LABELS[record.survey_type] || record.survey_type || '—'}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">Surveyor</span>
@@ -101,7 +94,7 @@ serve(async (req) => {
         </div>` : ''}
         <div class="detail-row">
           <span class="detail-label">Urgency</span>
-          <span class="detail-value">${urgencyBadge(record.urgency_state)}</span>
+          <span class="detail-value">${urgencyStateBadge(record.urgency_state)}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">Axiscape DB Prepared</span>

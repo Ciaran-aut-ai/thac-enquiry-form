@@ -8,7 +8,7 @@
 // ============================================================
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { sendEmail, emailWrapper, urgencyBadge, ADMIN_EMAIL } from '../_shared/email-templates.ts';
+import { sendEmail, emailWrapper, SURVEY_LABELS, ADMIN_EMAIL } from '../_shared/email-templates.ts';
 
 serve(async (req) => {
   try {
@@ -16,18 +16,18 @@ serve(async (req) => {
     const record    = payload.record;
     const oldRecord = payload.old_record;
 
-    // Only fire when transitioning TO report_sent
-    if (record.dispatch_state !== 'report_sent') {
-      return new Response('Not a report-sent transition', { status: 200 });
+    // Fires when report_finalised flips to true (DB trigger condition)
+    if (!record.report_finalised) {
+      return new Response('report_finalised not true — skipping', { status: 200 });
     }
-    if (oldRecord?.dispatch_state === 'report_sent') {
-      return new Response('Already report_sent — skipping', { status: 200 });
+    if (oldRecord?.report_finalised === true) {
+      return new Response('Already finalised — skipping', { status: 200 });
     }
 
-    const subject = `🟢 Report Sent — ${record.reference} | Invoice Now Required`;
+    const subject = `🟢 Report Finalised — ${record.reference} | Invoice Now Required`;
 
-    const reportSentAt = record.report_sent_at
-      ? new Date(record.report_sent_at).toLocaleString('en-GB')
+    const reportSentAt = record.report_finalised_at
+      ? new Date(record.report_finalised_at).toLocaleString('en-GB')
       : new Date().toLocaleString('en-GB');
 
     const isStaged = record.billing_mode === 'staged';
@@ -48,10 +48,10 @@ serve(async (req) => {
         </div>
         <div class="detail-row">
           <span class="detail-label">Survey Type</span>
-          <span class="detail-value">${record.survey_type || '—'}</span>
+          <span class="detail-value">${SURVEY_LABELS[record.survey_type] || record.survey_type || '—'}</span>
         </div>
         <div class="detail-row">
-          <span class="detail-label">Report Sent At</span>
+          <span class="detail-label">Report Finalised At</span>
           <span class="detail-value">${reportSentAt}</span>
         </div>
         <div class="detail-row">

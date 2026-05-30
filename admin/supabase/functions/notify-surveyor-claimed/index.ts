@@ -8,29 +8,21 @@
 // ============================================================
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { sendEmail, emailWrapper, urgencyBadge, ADMIN_EMAIL } from '../_shared/email-templates.ts';
+import { sendEmail, emailWrapper, urgencyStateBadge, SURVEY_LABELS, ADMIN_EMAIL } from '../_shared/email-templates.ts';
 
-const SUPABASE_URL     = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_THAC_SERVICE_ROLE_KEY')!;
 
-// Fetch surveyor name from users table via surveyor record
 async function getSurveyorName(surveyorId: string): Promise<string> {
-  if (!surveyorId) return 'Unknown Surveyor';
+  if (!surveyorId) return 'Unassigned';
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/surveyors?id=eq.${surveyorId}&select=user_id,users(full_name,email)`,
-      {
-        headers: {
-          'apikey': SUPABASE_SERVICE_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-        }
-      }
+      `${SUPABASE_URL}/rest/v1/surveyors?id=eq.${surveyorId}&select=full_name`,
+      { headers: { 'apikey': SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}` } }
     );
     const data = await res.json();
-    return data?.[0]?.users?.full_name || data?.[0]?.users?.email || 'Unknown Surveyor';
-  } catch {
-    return 'Unknown Surveyor';
-  }
+    return data?.[0]?.full_name || 'Unknown Surveyor';
+  } catch { return 'Unknown Surveyor'; }
 }
 
 serve(async (req) => {
@@ -39,15 +31,15 @@ serve(async (req) => {
     const record    = payload.record;
     const oldRecord = payload.old_record;
 
-    // Only fire when transitioning TO claimed
-    if (record.dispatch_state !== 'claimed') {
+    // Fires when dispatch_state transitions to 'orange' (surveyor claimed)
+    if (record.dispatch_state !== 'orange') {
       return new Response('Not a claim transition', { status: 200 });
     }
-    if (oldRecord?.dispatch_state === 'claimed') {
+    if (oldRecord?.dispatch_state === 'orange') {
       return new Response('Already claimed — skipping', { status: 200 });
     }
 
-    const surveyorName = await getSurveyorName(record.assigned_surveyor_id);
+    const surveyorName = await getSurveyorName(record.surveyor_id);
     const subject = `🟠 Job Claimed — ${record.reference} | ${surveyorName}`;
 
     const slaDate = record.sla_deadline
@@ -79,7 +71,7 @@ serve(async (req) => {
         </div>
         <div class="detail-row">
           <span class="detail-label">Survey Type</span>
-          <span class="detail-value">${record.survey_type || '—'}</span>
+          <span class="detail-value">${SURVEY_LABELS[record.survey_type] || record.survey_type || '—'}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">Site Postcode</span>
@@ -87,7 +79,7 @@ serve(async (req) => {
         </div>
         <div class="detail-row">
           <span class="detail-label">Urgency</span>
-          <span class="detail-value">${urgencyBadge(record.urgency_state)}</span>
+          <span class="detail-value">${urgencyStateBadge(record.urgency_state)}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">SLA Deadline</span>

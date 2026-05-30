@@ -70,13 +70,38 @@ export async function sendEmail(to: string, subject: string, html: string) {
   return data;
 }
 
-// ── Urgency badge helper ────────────────────────────────────
-export function urgencyBadge(tier: string): string {
+// ── Survey type labels ──────────────────────────────────────
+export const SURVEY_LABELS: Record<string, string> = {
+  bs5837:           'BS5837 Tree Survey (Planning)',
+  vta:              'Visual Tree Assessment',
+  bc:               'BS5837 Stage 2 (AIA/AMS/TPP)',
+  subs:             'Subsidence / Building Damage',
+  ams:              'Arboricultural Method Statement',
+  tpp:              'Tree Protection Plan',
+  tpo:              'TPO Application',
+  lscp:             'Landscaping Plans',
+  mortgage:         'Mortgage / Insurer Report',
+  supervision:      'Site Supervision',
+  amendment:        'Amendment',
+  planning_stage1:  'Planning — Stage 1 (BS5837)',
+  planning_stage2:  'Planning — Stage 2 (AIA/AMS/TPP)',
+  health_safety:    'Tree Condition / Risk Survey',
+  insurer_mortgage: 'Insurer / Mortgage Lender',
+  subsidence:       'Building Damage / Subsidence',
+  nhbc:             'Foundation Depths (NHBC)',
+  site_visit:       'Site Visit & Advice',
+  resistograph:     'Resistograph Testing',
+  other:            'Other',
+};
+
+// ── Urgency state badge (uses urgency_state values: red/orange/yellow/grey)
+export function urgencyStateBadge(state: string): string {
   const map: Record<string, string> = {
-    red:    '<span class="badge badge-urgent">🔴 Urgent (1 day)</span>',
-    orange: '<span class="badge badge-elevated">🟠 Elevated (3 days)</span>',
-    yellow: '<span class="badge badge-standard">🟡 Standard (5 days)</span>',
-    grey:   '<span class="badge badge-grey">⚪ Low Priority</span>',
+    red:    '<span class="badge badge-urgent">🔴 Urgent — within 1 working day</span>',
+    orange: '<span class="badge badge-elevated">🟠 Elevated — within 3 working days</span>',
+    yellow: '<span class="badge badge-standard">🟡 Standard — within 5 working days</span>',
+    grey:   '<span class="badge badge-grey">⚪ Low Priority — 10+ working days</span>',
+    green:  '<span class="badge badge-grey">🟢 Complete</span>',
   };
-  return map[tier] || tier;
+  return map[state] || `<span class="badge badge-grey">${state || '—'}</span>`;
 }

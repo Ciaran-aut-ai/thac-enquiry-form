@@ -582,7 +582,13 @@ function renderJob() {
             </div>
             <div class="detail-field">
               <label>Two-Stage Job</label>
-              <div class="field-value">${job.is_two_stage ? 'Yes' : 'No'}</div>
+              <div class="field-value" style="display:flex;align-items:center;gap:10px;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;margin:0;">
+                  <input type="checkbox" id="twoStageToggle" ${job.is_two_stage ? 'checked' : ''}
+                    onchange="toggleTwoStage(this.checked)">
+                  ${job.is_two_stage ? 'Yes — BS5837 Stage 1' : 'No'}
+                </label>
+              </div>
             </div>
             ${job.parent_job_id ? `
             <div class="detail-field">
@@ -828,6 +834,21 @@ async function geocodePostcode() {
     renderJob();
   } catch (e) {
     showToast('Geocoding error: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// TWO-STAGE TOGGLE
+// ============================================================
+
+async function toggleTwoStage(checked) {
+  try {
+    await dbUpdate('jobs', `id=eq.${jobId}`, { is_two_stage: checked });
+    job.is_two_stage = checked;
+    showToast(checked ? 'Marked as two-stage BS5837 job' : 'Removed two-stage flag');
+    renderJob();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
   }
 }
 

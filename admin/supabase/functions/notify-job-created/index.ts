@@ -6,7 +6,7 @@
 // ============================================================
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { sendEmail, emailWrapper, urgencyBadge, ADMIN_EMAIL } from '../_shared/email-templates.ts';
+import { sendEmail, emailWrapper, urgencyStateBadge, SURVEY_LABELS, ADMIN_EMAIL } from '../_shared/email-templates.ts';
 
 serve(async (req) => {
   try {
@@ -32,7 +32,7 @@ serve(async (req) => {
         </div>
         <div class="detail-row">
           <span class="detail-label">Survey Type</span>
-          <span class="detail-value">${record.survey_type || '—'}</span>
+          <span class="detail-value">${SURVEY_LABELS[record.survey_type] || record.survey_type || '—'}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">Job Type</span>
@@ -44,7 +44,7 @@ serve(async (req) => {
         </div>
         <div class="detail-row">
           <span class="detail-label">Urgency</span>
-          <span class="detail-value">${urgencyBadge(record.urgency_state)}</span>
+          <span class="detail-value">${urgencyStateBadge(record.urgency_state)}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">SLA Deadline</span>

@@ -98,6 +98,15 @@
       </select>
     </div>
     <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;">
+        <input type="checkbox" id="cvtTwoStage">
+        Two-stage BS5837 report
+      </label>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px;padding-left:20px;">
+        Tick if Stage 1 survey and Stage 2 report will be completed separately. Automatically sets staged 50/50 billing.
+      </div>
+    </div>
+    <div class="form-group">
       <label>Internal Notes</label>
       <textarea class="form-control" id="cvtNotes" placeholder="Any internal notes for this job..."></textarea>
     </div>
@@ -393,6 +402,11 @@ function openConvertModal() {
     document.getElementById('cvtAmount').value = enquiry.quoted_price;
   }
 
+  // Auto-switch billing to staged when two-stage is ticked
+  document.getElementById('cvtTwoStage').onchange = function() {
+    if (this.checked) document.getElementById('cvtBilling').value = 'staged';
+  };
+
   document.getElementById('convertModal').style.display = 'flex';
 }
 
@@ -446,6 +460,7 @@ async function confirmConvert() {
       urgency_surcharge: urgency_surcharge || null,
       estimated_tree_count: enquiry.tree_count_band || null,
       sla_deadline,
+      is_two_stage: document.getElementById('cvtTwoStage').checked,
       arranging_client_id: clientId,
       internal_notes: document.getElementById('cvtNotes').value.trim() || null,
     });
