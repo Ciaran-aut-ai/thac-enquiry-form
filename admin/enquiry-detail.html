@@ -246,6 +246,12 @@ function renderEnquiry() {
               <label>Required Deadline</label>
               <div class="field-value">${getDeadlineLabel(enquiry.deadline_tier)}</div>
             </div>
+            <div class="detail-field">
+              <label>Quoted Price</label>
+              <div class="field-value" style="font-size:20px;font-weight:700;color:var(--green-mid);">
+                ${enquiry.quoted_price ? '£' + Number(enquiry.quoted_price).toLocaleString() + ' <span style="font-size:13px;font-weight:400;color:var(--text-muted);">excl VAT</span>' : '<span style="font-size:14px;font-weight:400;">Custom quote</span>'}
+              </div>
+            </div>
           </div>
         </div>
         `}

@@ -1110,16 +1110,23 @@ async function submitNewEnquiry() {
   btn.classList.add('btn-loading');
   btn.textContent = 'Submitting...';
 
+  const treeCount   = document.getElementById('treeCount').value;
+  const deadlineTier = document.getElementById('deadline').value;
+  const base        = BASE_PRICES[treeCount];
+  const surcharge   = SURCHARGES[deadlineTier] || 0;
+  const quoted_price = (base !== null && base !== undefined) ? base + surcharge : null;
+
   const payload = {
     enquiry_type: 'new',
     survey_type: selectedSurveyType,
-    tree_count_band: document.getElementById('treeCount').value,
+    tree_count_band: treeCount,
     site_postcode: document.getElementById('sitePostcode').value.trim().toUpperCase(),
-    deadline_tier: document.getElementById('deadline').value,
+    deadline_tier: deadlineTier,
     contact_name: name,
     contact_email: email,
     contact_phone: document.getElementById('newPhone').value.trim(),
     company: document.getElementById('newCompany').value.trim(),
+    quoted_price,
     submitted_at: new Date().toISOString()
   };
 

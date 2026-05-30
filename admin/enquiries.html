@@ -67,7 +67,7 @@ async function init() {
 async function loadEnquiries(order = 'submitted_at.desc') {
   try {
     const data = await dbGet('enquiries', {
-      'select': 'id,job_number,enquiry_type,contact_name,contact_email,contact_phone,survey_type,site_postcode,deadline_tier,status,submitted_at,company',
+      'select': 'id,job_number,enquiry_type,contact_name,contact_email,contact_phone,survey_type,site_postcode,deadline_tier,status,submitted_at,company,quoted_price',
       'order': order
     });
 
@@ -121,6 +121,7 @@ function renderTable() {
       <td>${getSurveyLabel(e.survey_type)}</td>
       <td>${e.site_postcode || '—'}</td>
       <td>${urgencyBadge(e.deadline_tier)}</td>
+      <td>${e.quoted_price ? '£' + Number(e.quoted_price).toLocaleString() : '<span class="muted">Custom</span>'}</td>
       <td>${statusBadge(e.status)}</td>
       <td class="muted">${timeAgo(e.submitted_at)}</td>
     </tr>
@@ -135,6 +136,7 @@ function renderTable() {
           <th>Survey Type</th>
           <th>Postcode</th>
           <th>Urgency</th>
+          <th>Quote</th>
           <th>Status</th>
           <th>Received</th>
         </tr>
