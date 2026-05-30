@@ -423,6 +423,61 @@ function renderJob() {
           </div>
         </div>
 
+        <!-- Site Access -->
+        <div class="card">
+          <div class="card-title">
+            Site Access
+            <button class="btn btn-secondary btn-sm" id="editAccessBtn" onclick="toggleAccessEditor()">
+              ${job.site_access_notes ? 'Edit' : 'Add details'}
+            </button>
+          </div>
+          <div id="accessDisplay">
+            ${job.site_access_notes
+              ? `<div style="font-size:13px;line-height:1.6;background:var(--bg);padding:12px;border-radius:8px;">${job.site_access_notes}</div>`
+              : `<div style="font-size:13px;color:var(--text-muted);">No access details yet — parking, gate codes, what3words, appointment requirements.</div>`}
+          </div>
+          <div id="accessEditor" style="display:none;margin-top:8px;">
+            <textarea class="form-control" id="accessText" rows="4"
+              placeholder="Parking location, gate codes, what3words, appointment requirements, access restrictions...">${job.site_access_notes || ''}</textarea>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <button class="btn btn-secondary" onclick="toggleAccessEditor()">Cancel</button>
+              <button class="btn btn-primary" onclick="saveAccessNotes()">Save</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Billing Contact -->
+        <div class="card">
+          <div class="card-title">
+            Billing Contact
+            <button class="btn btn-secondary btn-sm" id="editBillingBtn" onclick="toggleBillingEditor()">
+              ${(job.billing_contact_name || job.billing_contact_email) ? 'Edit' : 'Add details'}
+            </button>
+          </div>
+          <div id="billingDisplay">
+            ${(job.billing_contact_name || job.billing_contact_email)
+              ? `<div class="detail-grid">
+                  ${job.billing_contact_name ? `<div class="detail-field"><label>Name</label><div class="field-value">${job.billing_contact_name}</div></div>` : ''}
+                  ${job.billing_contact_email ? `<div class="detail-field"><label>Email</label><div class="field-value"><a href="mailto:${job.billing_contact_email}">${job.billing_contact_email}</a></div></div>` : ''}
+                </div>`
+              : `<div style="font-size:13px;color:var(--text-muted);">Same as arranging client unless specified.</div>`}
+          </div>
+          <div id="billingEditor" style="display:none;margin-top:8px;">
+            <div class="form-group">
+              <label>Billing Contact Name</label>
+              <input type="text" class="form-control" id="billingName" value="${job.billing_contact_name || ''}" placeholder="Full name or company">
+            </div>
+            <div class="form-group">
+              <label>Billing Contact Email</label>
+              <input type="email" class="form-control" id="billingEmail" value="${job.billing_contact_email || ''}" placeholder="invoice@example.com">
+            </div>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+              <button class="btn btn-secondary" onclick="toggleBillingEditor()">Cancel</button>
+              <button class="btn btn-primary" onclick="saveBillingContact()">Save</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Internal Notes (always shown) -->
         <div class="card">
           <div class="card-title">
@@ -764,6 +819,56 @@ async function approveToMap() {
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
   }
+}
+
+// ============================================================
+// SITE ACCESS NOTES
+// ============================================================
+
+function toggleAccessEditor() {
+  const display = document.getElementById('accessDisplay');
+  const editor  = document.getElementById('accessEditor');
+  const btn     = document.getElementById('editAccessBtn');
+  const isEditing = editor.style.display !== 'none';
+  display.style.display = isEditing ? '' : 'none';
+  editor.style.display  = isEditing ? 'none' : '';
+  btn.textContent = isEditing ? (job.site_access_notes ? 'Edit' : 'Add details') : 'Cancel';
+}
+
+async function saveAccessNotes() {
+  const text = document.getElementById('accessText').value.trim();
+  try {
+    await dbUpdate('jobs', `id=eq.${jobId}`, { site_access_notes: text || null });
+    job.site_access_notes = text || null;
+    showToast('Site access details saved');
+    renderJob();
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+// ============================================================
+// BILLING CONTACT
+// ============================================================
+
+function toggleBillingEditor() {
+  const display = document.getElementById('billingDisplay');
+  const editor  = document.getElementById('billingEditor');
+  const btn     = document.getElementById('editBillingBtn');
+  const isEditing = editor.style.display !== 'none';
+  display.style.display = isEditing ? '' : 'none';
+  editor.style.display  = isEditing ? 'none' : '';
+  btn.textContent = isEditing ? ((job.billing_contact_name || job.billing_contact_email) ? 'Edit' : 'Add details') : 'Cancel';
+}
+
+async function saveBillingContact() {
+  const name  = document.getElementById('billingName').value.trim() || null;
+  const email = document.getElementById('billingEmail').value.trim() || null;
+  try {
+    await dbUpdate('jobs', `id=eq.${jobId}`, { billing_contact_name: name, billing_contact_email: email });
+    job.billing_contact_name  = name;
+    job.billing_contact_email = email;
+    showToast('Billing contact saved');
+    renderJob();
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
 }
 
 // ============================================================

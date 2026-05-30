@@ -47,9 +47,9 @@ async function init() {
             <div class="stat-sub">Due within 5 working days</div>
           </div>
           <div class="stat-card complete">
-            <div class="stat-label">✅ New Enquiries</div>
-            <div class="stat-value" id="statNew">—</div>
-            <div class="stat-sub">Awaiting review</div>
+            <div class="stat-label">⚫ Low Priority Jobs</div>
+            <div class="stat-value" id="statLow">—</div>
+            <div class="stat-sub">10+ working days</div>
           </div>
         </div>
 
@@ -92,17 +92,17 @@ async function init() {
 // ============================================================
 async function loadStats() {
   try {
-    const [urgent, elevated, standard, newEnquiries] = await Promise.all([
-      dbGet('jobs',     { 'urgency_state': 'eq.red',    'is_archived': 'not.eq.true', 'select': 'id' }),
-      dbGet('jobs',     { 'urgency_state': 'eq.orange',  'is_archived': 'not.eq.true', 'select': 'id' }),
-      dbGet('jobs',     { 'urgency_state': 'eq.yellow',  'is_archived': 'not.eq.true', 'select': 'id' }),
-      dbGet('enquiries',{ 'status': 'eq.new', 'select': 'id' })
+    const [urgent, elevated, standard, low] = await Promise.all([
+      dbGet('jobs', { 'urgency_state': 'eq.red',    'is_archived': 'not.eq.true', 'select': 'id' }),
+      dbGet('jobs', { 'urgency_state': 'eq.orange', 'is_archived': 'not.eq.true', 'select': 'id' }),
+      dbGet('jobs', { 'urgency_state': 'eq.yellow', 'is_archived': 'not.eq.true', 'select': 'id' }),
+      dbGet('jobs', { 'urgency_state': 'eq.grey',   'is_archived': 'not.eq.true', 'select': 'id' }),
     ]);
 
     document.getElementById('statUrgent').textContent   = urgent?.length   || 0;
     document.getElementById('statElevated').textContent = elevated?.length || 0;
     document.getElementById('statStandard').textContent = standard?.length || 0;
-    document.getElementById('statNew').textContent      = newEnquiries?.length || 0;
+    document.getElementById('statLow').textContent      = low?.length      || 0;
   } catch (e) {
     console.error('Stats error:', e);
   }
@@ -119,6 +119,17 @@ function jobUrgencyRowClass(state) {
     case 'yellow': return 'urgency-standard';
     default:       return 'urgency-low';
   }
+}
+
+function slaCountdown(dateStr) {
+  if (!dateStr) return '<span class="muted">No SLA set</span>';
+  const days = Math.ceil((new Date(dateStr) - Date.now()) / (1000 * 60 * 60 * 24));
+  if (days < 0)  return `<span style="color:#dc2626;font-weight:700;">⚠️ ${Math.abs(days)}d overdue</span>`;
+  if (days === 0) return `<span style="color:#dc2626;font-weight:700;">⚠️ Due today</span>`;
+  if (days <= 1)  return `<span style="color:#dc2626;font-weight:600;">🔴 ${days}d left</span>`;
+  if (days <= 3)  return `<span style="color:#ea580c;font-weight:600;">🟠 ${days}d left</span>`;
+  if (days <= 5)  return `<span style="color:#ca8a04;font-weight:600;">🟡 ${days}d left</span>`;
+  return `<span style="color:var(--text-muted);">${days}d left</span>`;
 }
 
 function dispatchBadge(state) {
@@ -149,7 +160,7 @@ function urgencyStateBadge(state) {
 async function loadUrgencyDashboard() {
   try {
     const jobs = await dbGet('jobs', {
-      'select': 'id,reference,survey_type,job_type,urgency_state,dispatch_state,site_postcode,survey_date,agreed_amount',
+      'select': 'id,reference,survey_type,job_type,urgency_state,dispatch_state,site_postcode,survey_date,agreed_amount,sla_deadline',
       'is_archived': 'not.eq.true',
       'order': 'created_at.desc',
       'limit': 50
@@ -174,12 +185,12 @@ async function loadUrgencyDashboard() {
           onclick="window.location.href='job-detail.html?id=${j.id}'" style="cursor:pointer">
         <td>
           <div class="ref">${j.reference || '—'}</div>
-          <div class="muted">${j.survey_date ? formatDate(j.survey_date) : 'No date'}</div>
+          <div class="muted">${j.survey_date ? formatDate(j.survey_date) : 'No date set'}</div>
         </td>
         <td>${getSurveyLabel(j.survey_type || j.job_type)}</td>
         <td>${j.site_postcode || '—'}</td>
+        <td>${slaCountdown(j.sla_deadline)}</td>
         <td>${j.agreed_amount ? '£' + Number(j.agreed_amount).toLocaleString() : '—'}</td>
-        <td>${urgencyStateBadge(j.urgency_state)}</td>
         <td>${dispatchBadge(j.dispatch_state)}</td>
       </tr>
     `).join('');
@@ -191,8 +202,8 @@ async function loadUrgencyDashboard() {
             <th>Reference</th>
             <th>Survey Type</th>
             <th>Postcode</th>
+            <th>SLA Deadline</th>
             <th>Value</th>
-            <th>Urgency</th>
             <th>Dispatch</th>
           </tr>
         </thead>
