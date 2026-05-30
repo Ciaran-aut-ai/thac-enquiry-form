@@ -1,16 +1,16 @@
 -- Webhook: fire notify-quote-accepted when enquiry status flips to 'accepted'.
+-- Uses the same supabase_functions.http_request() pattern as all other triggers.
 
 CREATE OR REPLACE FUNCTION trigger_notify_quote_accepted()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF (OLD.status IS DISTINCT FROM 'accepted') AND NEW.status = 'accepted' THEN
-    PERFORM net.http_post(
-      url     := 'https://lemppaqgpntadeylzzwn.supabase.co/functions/v1/notify-quote-accepted',
-      headers := jsonb_build_object(
-        'Content-Type',  'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.supabase_anon_key', true)
-      ),
-      body    := jsonb_build_object('record', row_to_json(NEW), 'old_record', row_to_json(OLD))
+    PERFORM supabase_functions.http_request(
+      'https://lemppaqgpntadeylzzwn.supabase.co/functions/v1/notify-quote-accepted',
+      'POST',
+      '{"Content-Type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlbXBwYXFncG50YWRleWx6enduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMTUzOTMsImV4cCI6MjA5NDg5MTM5M30.SU2M7e5OSwqIjRJfM15uKLHTqSrLadcY46MR51twosU"}'::jsonb,
+      jsonb_build_object('record', row_to_json(NEW), 'old_record', row_to_json(OLD)),
+      5000
     );
   END IF;
   RETURN NEW;
