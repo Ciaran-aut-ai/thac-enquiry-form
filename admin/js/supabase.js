@@ -58,6 +58,11 @@ async function dbUpdate(table, filter, data) {
   });
 }
 
+// DELETE — delete row
+async function dbDelete(table, filter) {
+  return supabaseRequest(`${table}?${filter}`, { method: 'DELETE' });
+}
+
 // ============================================================
 // AUTH
 // ============================================================
