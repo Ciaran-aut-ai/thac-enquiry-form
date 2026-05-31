@@ -620,6 +620,8 @@ async function confirmConvert() {
     const jobData = await dbInsert('jobs', {
       survey_type: document.getElementById('cvtSurveyType').value,
       site_postcode: postcode,
+      home_lat: enquiry.home_lat || null,
+      home_lng: enquiry.home_lng || null,
       urgency_state: document.getElementById('cvtUrgency').value,
       job_type: 'new',
       dispatch_state: 'pending_approval',

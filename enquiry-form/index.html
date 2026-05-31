@@ -1140,13 +1140,19 @@ async function submitNewEnquiry() {
   const surcharge   = SURCHARGES[deadlineTier] || 0;
   const quoted_price = (base !== null && base !== undefined) ? base + surcharge : null;
 
+  // Geocode the postcode
+  const postcode = document.getElementById('sitePostcode').value.trim().toUpperCase();
+  const coords = await geocodePostcode(postcode);
+
   const payload = {
     enquiry_type: 'new',
     survey_type: selectedSurveyType,
     tree_count_band: treeCount,
     site_street: document.getElementById('siteStreet').value.trim(),
     site_city: document.getElementById('siteCity').value.trim(),
-    site_postcode: document.getElementById('sitePostcode').value.trim().toUpperCase(),
+    site_postcode: postcode,
+    home_lat: coords?.lat || null,
+    home_lng: coords?.lng || null,
     deadline_tier: deadlineTier,
     contact_name: name,
     contact_email: email,
@@ -1186,6 +1192,22 @@ async function submitAmendment() {
   };
 
   await submitToSupabase(payload, email);
+}
+
+async function geocodePostcode(postcode) {
+  try {
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(postcode)}&key=AIzaSyAcI85g0gVVH1Uw-YMGVKvYYKWTXTKBbW8`
+    );
+    const data = await response.json();
+    if (data.results && data.results.length > 0) {
+      const location = data.results[0].geometry.location;
+      return { lat: location.lat, lng: location.lng };
+    }
+  } catch (e) {
+    console.error('Geocoding failed:', e);
+  }
+  return null;
 }
 
 async function submitToSupabase(payload, email) {
