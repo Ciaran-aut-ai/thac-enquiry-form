@@ -136,6 +136,9 @@ async function loadJob() {
       stage2Job = (children && children.length) ? children[0] : null;
     }
 
+    // Load uploaded files
+    await loadUploadedFiles();
+
     renderJob();
   } catch (e) {
     document.getElementById('pageBody').innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
@@ -398,6 +401,14 @@ function renderJob() {
             </div>
           </div>
           ${renderInvoiceSection()}
+        </div>
+
+        <!-- Uploaded Files -->
+        <div class="card" id="uploadedFilesCard" style="display:none;">
+          <div class="card-title">Uploaded Files</div>
+          <div id="uploadedFilesList" style="display:flex;flex-direction:column;gap:8px;">
+            <div class="muted">Loading files...</div>
+          </div>
         </div>
 
         <!-- Progress Checklist -->
@@ -1245,6 +1256,51 @@ async function saveNote() {
     job.internal_notes = text || null;
     showToast('Note saved');
     renderJob();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+async function loadUploadedFiles() {
+  try {
+    const files = await dbGet('job_files', { 'job_id': `eq.${jobId}`, 'order': 'uploaded_at.desc' });
+
+    if (!files || files.length === 0) {
+      document.getElementById('uploadedFilesCard').style.display = 'none';
+      return;
+    }
+
+    document.getElementById('uploadedFilesCard').style.display = 'block';
+
+    const html = files.map(f => {
+      const fileName = f.file_name || f.file_path.split('/').pop();
+      const date = formatDate(f.uploaded_at);
+      const icon = f.file_type === 'image' ? '🖼️' : f.file_type === 'video' ? '🎥' : '📄';
+
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:#f9f9f9;border-radius:6px;">
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);">${icon} ${fileName}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${date}</div>
+          </div>
+          <a href="#" onclick="downloadFile('${f.file_path}');return false;" style="color:var(--green-dark);text-decoration:none;font-weight:600;margin-left:8px;">
+            ⬇️ Download
+          </a>
+        </div>
+      `;
+    }).join('');
+
+    document.getElementById('uploadedFilesList').innerHTML = html;
+  } catch (e) {
+    console.error('Error loading files:', e);
+  }
+}
+
+async function downloadFile(filePath) {
+  try {
+    const { data, error } = await supabase.storage.from('THAC-CRM_Bucket').createSignedUrl(filePath, 3600);
+    if (error) throw error;
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
   }
