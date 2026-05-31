@@ -1196,13 +1196,16 @@ async function submitAmendment() {
 
 async function geocodePostcode(postcode) {
   try {
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(postcode)}&key=AIzaSyAcI85g0gVVH1Uw-YMGVKvYYKWTXTKBbW8`
-    );
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(postcode)}&key=AIzaSyAcI85g0gVVH1Uw-YMGVKvYYKWTXTKBbW8`;
+    const response = await fetch(url);
     const data = await response.json();
+    console.log('Geocoding response:', data);
     if (data.results && data.results.length > 0) {
       const location = data.results[0].geometry.location;
+      console.log('Found coordinates:', location);
       return { lat: location.lat, lng: location.lng };
+    } else {
+      console.log('No results found for postcode:', postcode);
     }
   } catch (e) {
     console.error('Geocoding failed:', e);
