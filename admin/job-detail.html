@@ -136,10 +136,10 @@ async function loadJob() {
       stage2Job = (children && children.length) ? children[0] : null;
     }
 
-    // Load uploaded files
-    await loadUploadedFiles();
-
     renderJob();
+
+    // Load uploaded files after render
+    await loadUploadedFiles();
   } catch (e) {
     document.getElementById('pageBody').innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
   }
@@ -403,16 +403,8 @@ function renderJob() {
           ${renderInvoiceSection()}
         </div>
 
-        <!-- Uploaded Files -->
-        <div class="card" id="uploadedFilesCard" style="display:none;">
-          <div class="card-title">Uploaded Files</div>
-          <div id="uploadedFilesList" style="display:flex;flex-direction:column;gap:8px;">
-            <div class="muted">Loading files...</div>
-          </div>
-        </div>
-
         <!-- Progress Checklist -->
-        <div class="card">
+        <div class="card" id="progressChecklist">
           <div class="card-title">Progress Checklist</div>
           <div style="display:flex;flex-direction:column;">
             ${[
@@ -1265,12 +1257,7 @@ async function loadUploadedFiles() {
   try {
     const files = await dbGet('job_files', { 'job_id': `eq.${jobId}`, 'order': 'uploaded_at.desc' });
 
-    if (!files || files.length === 0) {
-      document.getElementById('uploadedFilesCard').style.display = 'none';
-      return;
-    }
-
-    document.getElementById('uploadedFilesCard').style.display = 'block';
+    if (!files || files.length === 0) return;
 
     const html = files.map(f => {
       const fileName = f.file_name || f.file_path.split('/').pop();
@@ -1290,7 +1277,22 @@ async function loadUploadedFiles() {
       `;
     }).join('');
 
-    document.getElementById('uploadedFilesList').innerHTML = html;
+    const card = `
+      <div class="card">
+        <div class="card-title">Uploaded Files</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${html}
+        </div>
+      </div>
+    `;
+
+    const pageBody = document.getElementById('pageBody');
+    const progressCard = pageBody.querySelector('[id="progressChecklist"]');
+    if (progressCard) {
+      progressCard.insertAdjacentHTML('beforebegin', card);
+    } else {
+      pageBody.insertAdjacentHTML('beforeend', card);
+    }
   } catch (e) {
     console.error('Error loading files:', e);
   }
