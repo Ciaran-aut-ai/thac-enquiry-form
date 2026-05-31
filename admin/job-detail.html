@@ -1409,7 +1409,7 @@ async function createStage2Job() {
       dispatch_state: 'red',
       urgency_state: deadline === '1day' ? '1day' : deadline === '3days' ? '3days' : deadline === '5days' ? '5days' : '10days',
       billing_mode: job.billing_mode,
-      urgency_surcharge: urgency_surcharge || null,
+      urgency_surcharge: urgency_surcharge || 0,
       sla_deadline: slaDeadline.toISOString(),
       is_two_stage: false,
       arranging_client_id: job.arranging_client_id,

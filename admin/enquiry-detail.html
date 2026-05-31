@@ -632,7 +632,7 @@ async function confirmConvert() {
       billing_mode: document.getElementById('cvtBilling').value,
       quoted_amount: amount ? parseFloat(amount) : null,
       agreed_amount: amount ? parseFloat(amount) : null,
-      urgency_surcharge: urgency_surcharge || null,
+      urgency_surcharge: urgency_surcharge || 0,
       sla_deadline,
       is_two_stage: document.getElementById('cvtTwoStage').checked,
       arranging_client_id: clientId,
