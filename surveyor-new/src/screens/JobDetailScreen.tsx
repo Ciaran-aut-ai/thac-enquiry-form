@@ -57,7 +57,7 @@ export default function JobDetailScreen() {
       const ext = fileName.split('.').pop() || 'bin';
       const storagePath = `${jobId}/${Date.now()}.${ext}`;
 
-      const { error: uploadErr } = await supabase.storage.from('job-files').upload(storagePath, {
+      const { error: uploadErr } = await supabase.storage.from('THAC-CRM_Bucket').upload(storagePath, {
         uri: file.uri,
         type: file.mimeType || 'application/octet-stream',
         name: fileName,
@@ -88,7 +88,7 @@ export default function JobDetailScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', onPress: async () => {
         try {
-          await supabase.storage.from('job-files').remove([filePath]);
+          await supabase.storage.from('THAC-CRM_Bucket').remove([filePath]);
           await supabase.from('job_files').delete().eq('file_path', filePath);
           loadData();
         } catch (e: any) {
