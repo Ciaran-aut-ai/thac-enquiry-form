@@ -755,6 +755,20 @@
       </div>
 
       <div class="field-group">
+        <label>Site Address — Street <span class="required">*</span></label>
+        <input type="text" id="siteStreet" placeholder="e.g. 123 Oak Lane">
+        <div class="field-hint">The street address of the property where the trees are located.</div>
+        <div class="field-error" id="siteStreetError">Please enter the street address.</div>
+      </div>
+
+      <div class="field-group">
+        <label>Site Address — City/Town <span class="required">*</span></label>
+        <input type="text" id="siteCity" placeholder="e.g. London">
+        <div class="field-hint">The city or town where the property is located.</div>
+        <div class="field-error" id="siteCityError">Please enter the city or town.</div>
+      </div>
+
+      <div class="field-group">
         <label>Site Postcode <span class="required">*</span></label>
         <input type="text" id="sitePostcode" placeholder="e.g. SW1A 1AA" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
         <div class="field-hint">The postcode of the property where the trees are located.</div>
@@ -1018,6 +1032,8 @@ function updateQuotePreview() {
 
 function goToQuote() {
   const treeCount = document.getElementById('treeCount').value;
+  const street = document.getElementById('siteStreet').value.trim();
+  const city = document.getElementById('siteCity').value.trim();
   const postcode = document.getElementById('sitePostcode').value.trim();
   const deadline = document.getElementById('deadline').value;
 
@@ -1026,6 +1042,14 @@ function goToQuote() {
   if (!treeCount) {
     showError('treeCountError', 'treeCount'); valid = false;
   } else { hideError('treeCountError', 'treeCount'); }
+
+  if (!street) {
+    showError('siteStreetError', 'siteStreet'); valid = false;
+  } else { hideError('siteStreetError', 'siteStreet'); }
+
+  if (!city) {
+    showError('siteCityError', 'siteCity'); valid = false;
+  } else { hideError('siteCityError', 'siteCity'); }
 
   if (!postcode || postcode.length < 5) {
     showError('sitePostcodeError', 'sitePostcode'); valid = false;
@@ -1120,6 +1144,8 @@ async function submitNewEnquiry() {
     enquiry_type: 'new',
     survey_type: selectedSurveyType,
     tree_count_band: treeCount,
+    site_street: document.getElementById('siteStreet').value.trim(),
+    site_city: document.getElementById('siteCity').value.trim(),
     site_postcode: document.getElementById('sitePostcode').value.trim().toUpperCase(),
     deadline_tier: deadlineTier,
     contact_name: name,

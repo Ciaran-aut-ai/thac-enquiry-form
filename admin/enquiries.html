@@ -67,7 +67,7 @@ async function init() {
 async function loadEnquiries(order = 'submitted_at.desc') {
   try {
     const data = await dbGet('enquiries', {
-      'select': 'id,job_number,enquiry_type,contact_name,contact_email,contact_phone,survey_type,site_postcode,deadline_tier,status,submitted_at,company,quoted_price',
+      'select': 'id,job_number,enquiry_type,contact_name,contact_email,contact_phone,survey_type,site_street,site_city,site_postcode,deadline_tier,status,submitted_at,company,quoted_price',
       'order': order
     });
 
@@ -90,6 +90,8 @@ function renderTable() {
     filtered = filtered.filter(e =>
       (e.contact_name || '').toLowerCase().includes(q) ||
       (e.job_number || '').toLowerCase().includes(q) ||
+      (e.site_street || '').toLowerCase().includes(q) ||
+      (e.site_city || '').toLowerCase().includes(q) ||
       (e.site_postcode || '').toLowerCase().includes(q) ||
       (e.contact_email || '').toLowerCase().includes(q) ||
       (e.company || '').toLowerCase().includes(q)
@@ -119,7 +121,13 @@ function renderTable() {
         <div class="muted">${e.company || e.contact_email || ''}</div>
       </td>
       <td>${getSurveyLabel(e.survey_type)}</td>
-      <td>${e.site_postcode || '—'}</td>
+      <td>
+        <div style="font-size:13px;line-height:1.4;">
+          ${e.site_street ? `${e.site_street}<br>` : ''}
+          ${e.site_city || ''}${e.site_postcode ? ` ${e.site_postcode}` : ''}
+          ${!e.site_street && !e.site_city && !e.site_postcode ? '—' : ''}
+        </div>
+      </td>
       <td>${urgencyBadge(e.deadline_tier)}</td>
       <td>${e.quoted_price ? '£' + Number(e.quoted_price).toLocaleString() : '<span class="muted">Custom</span>'}</td>
       <td>${statusBadge(e.status)}</td>
