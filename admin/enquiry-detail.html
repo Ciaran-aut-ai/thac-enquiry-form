@@ -590,18 +590,26 @@ async function confirmConvert() {
   btn.disabled = true;
 
   try {
-    // Step 1 — Create client record
+    // Step 1 — Get or create client record
     const companyName = document.getElementById('cvtCompany').value.trim();
-    const clientData = await dbInsert('clients', {
-      full_name: name,
-      company_name: companyName || name,
-      email: email,
-      phone: document.getElementById('cvtPhone').value.trim() || null,
-      address_postcode: postcode,
-      client_type: companyName ? 'company' : 'individual',
-    });
+    let clientId = null;
 
-    const clientId = clientData[0].id;
+    // Check if client with this email already exists
+    const existing = await dbGet('clients', { 'email': `eq.${email}`, 'select': 'id', 'limit': 1 });
+    if (existing && existing.length > 0) {
+      clientId = existing[0].id;
+    } else {
+      // Create new client
+      const clientData = await dbInsert('clients', {
+        full_name: name,
+        company_name: companyName || name,
+        email: email,
+        phone: document.getElementById('cvtPhone').value.trim() || null,
+        address_postcode: postcode,
+        client_type: companyName ? 'company' : 'individual',
+      });
+      clientId = clientData[0].id;
+    }
 
     // Step 2 — Create job record
     const amount = document.getElementById('cvtAmount').value;
