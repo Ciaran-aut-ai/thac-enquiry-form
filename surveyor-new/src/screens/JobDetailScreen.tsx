@@ -4,6 +4,7 @@ import {
   Alert, ActivityIndicator, Linking, TextInput,
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
+import * as DocumentPicker from 'expo-document-picker';
 import { supabase } from '../lib/supabase';
 import { Job, RootStackParamList } from '../types';
 
@@ -23,6 +24,8 @@ export default function JobDetailScreen() {
   const [loading,    setLoading]    = useState(true);
   const [notes,      setNotes]      = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [files,      setFiles]      = useState<any[]>([]);
+  const [uploading,  setUploading]  = useState(false);
 
   useEffect(() => { loadData(); }, []);
 
@@ -30,15 +33,69 @@ export default function JobDetailScreen() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
 
-    const [{ data: jobData }, { data: survData }] = await Promise.all([
+    const [{ data: jobData }, { data: survData }, { data: filesData }] = await Promise.all([
       supabase.from('jobs').select('*').eq('id', jobId).single(),
       supabase.from('surveyors').select('id').eq('user_id', user?.id || '').single(),
+      supabase.from('job_files').select('*').eq('job_id', jobId).order('uploaded_at', { ascending: false }),
     ]);
 
     setJob(jobData);
     setSurveyorId(survData?.id || null);
     setNotes(jobData?.surveyor_notes || '');
+    setFiles(filesData || []);
     setLoading(false);
+  }
+
+  async function uploadFile() {
+    try {
+      setUploading(true);
+      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: false });
+      if (result.canceled) return;
+
+      const file = result.assets[0];
+      const fileName = file.name;
+      const ext = fileName.split('.').pop() || 'bin';
+      const storagePath = `${jobId}/${Date.now()}.${ext}`;
+
+      const { error: uploadErr } = await supabase.storage.from('job-files').upload(storagePath, {
+        uri: file.uri,
+        type: file.mimeType || 'application/octet-stream',
+        name: fileName,
+      } as any);
+
+      if (uploadErr) throw uploadErr;
+
+      const { error: dbErr } = await supabase.from('job_files').insert({
+        job_id: jobId,
+        file_name: fileName,
+        file_path: storagePath,
+        file_type: file.mimeType?.split('/')[0] || 'document',
+        uploaded_by: (await supabase.auth.getUser()).data.user?.id,
+      });
+
+      if (dbErr) throw dbErr;
+      Alert.alert('Success', `${fileName} uploaded.`);
+      loadData();
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function deleteFile(filePath: string) {
+    Alert.alert('Delete', 'Remove this file?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', onPress: async () => {
+        try {
+          await supabase.storage.from('job-files').remove([filePath]);
+          await supabase.from('job_files').delete().eq('file_path', filePath);
+          loadData();
+        } catch (e: any) {
+          Alert.alert('Error', e.message);
+        }
+      }, style: 'destructive' },
+    ]);
   }
 
   async function claimJob() {
@@ -166,6 +223,31 @@ export default function JobDetailScreen() {
         </View>
       )}
 
+      {/* Uploaded Files */}
+      {isMine && (
+        <View style={s.card}>
+          <Text style={s.sectionTitle}>Uploaded Files</Text>
+          {files.length === 0 ? (
+            <Text style={s.body}>No files uploaded yet.</Text>
+          ) : (
+            files.map((f) => (
+              <View key={f.id} style={s.fileItem}>
+                <View style={s.fileInfo}>
+                  <Text style={s.fileName}>{f.file_name}</Text>
+                  <Text style={s.fileDate}>{new Date(f.uploaded_at).toLocaleDateString('en-GB')}</Text>
+                </View>
+                <TouchableOpacity onPress={() => deleteFile(f.file_path)}>
+                  <Text style={s.fileDelete}>🗑</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+          <TouchableOpacity style={s.uploadBtn} onPress={uploadFile} disabled={uploading}>
+            <Text style={s.uploadBtnText}>{uploading ? 'Uploading…' : '📤 Upload File'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Actions */}
       <View style={s.actions}>
         {isAvailable && (
@@ -220,4 +302,11 @@ const s = StyleSheet.create({
   btnSecondaryText: { color: '#dc2626', fontSize: 15, fontWeight: '600' },
   infoBox:       { backgroundColor: '#fefce8', borderRadius: 12, padding: 16 },
   infoText:      { color: '#854d0e', fontSize: 14, textAlign: 'center' },
+  fileItem:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  fileInfo:      { flex: 1 },
+  fileName:      { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 2 },
+  fileDate:      { fontSize: 12, color: '#9ca3af' },
+  fileDelete:    { fontSize: 18, padding: 8 },
+  uploadBtn:     { backgroundColor: '#e5f0eb', borderRadius: 8, padding: 12, alignItems: 'center', marginTop: 8 },
+  uploadBtnText: { color: GREEN, fontWeight: '600', fontSize: 14 },
 });
