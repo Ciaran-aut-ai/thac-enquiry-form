@@ -646,6 +646,7 @@ function renderJob() {
           <div class="card-title">Quick Actions</div>
           <div style="display:flex;flex-direction:column;gap:8px;">
             ${renderDispatchButton()}
+            ${renderStage2Button()}
             ${renderInvoiceActions()}
           </div>
         </div>
@@ -1020,6 +1021,16 @@ async function activateStage2() {
 // DISPATCH TO MAP
 // ============================================================
 
+function renderStage2Button() {
+  // Show button only on Stage 1 jobs that have field data uploaded
+  if (!job.is_two_stage || job.parent_job_id || !job.field_data_uploaded) return '';
+
+  // Check if Stage 2 already exists
+  if (stage2Job) return `<button class="btn btn-secondary w-100" style="justify-content:center;" disabled>✅ Stage 2 Created</button>`;
+
+  return `<button class="btn btn-primary w-100" style="justify-content:center;background:var(--amber);" onclick="showCreateStage2Modal()">📋 Create Stage 2 Job</button>`;
+}
+
 function renderDispatchButton() {
   const d = job.dispatch_state;
   if (d === 'pending_approval') {
@@ -1330,6 +1341,96 @@ async function downloadAllFiles(jobId) {
     }
 
     showToast(`${files.length} file(s) downloading`);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+function showCreateStage2Modal() {
+  const modal = document.createElement('div');
+  modal.id = 'stage2Modal';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-title">Create Stage 2 Report Job</div>
+      <div class="modal-sub">Generate a report job from this completed survey</div>
+
+      <div class="field-group">
+        <label>Report Type <span class="required">*</span></label>
+        <select id="stage2SurveyType">
+          <option value="">Select report type...</option>
+          <option value="bc">BS5837 Stage 2 (AIA/AMS/TPP)</option>
+          <option value="other">Other Report Type</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label>Report Deadline <span class="required">*</span></label>
+        <select id="stage2Deadline">
+          <option value="">Select deadline...</option>
+          <option value="1day">Within 1 working day (+£150 surcharge)</option>
+          <option value="3days">Within 3 working days (+£50 surcharge)</option>
+          <option value="5days">Within 5 working days (standard rate)</option>
+          <option value="10days">Within 10 working days / No urgency (standard rate)</option>
+        </select>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary w-100" onclick="document.getElementById('stage2Modal').remove()">Cancel</button>
+        <button class="btn btn-primary w-100" onclick="createStage2Job()">Create</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+}
+
+async function createStage2Job() {
+  const surveyType = document.getElementById('stage2SurveyType').value;
+  const deadline = document.getElementById('stage2Deadline').value;
+
+  if (!surveyType || !deadline) {
+    showToast('Please select report type and deadline', 'error');
+    return;
+  }
+
+  try {
+    const surchargeMap = { '1day': 150, '3days': 50, '5days': 0, '10days': 0 };
+    const urgency_surcharge = surchargeMap[deadline] || null;
+    const slaDeadline = new Date();
+    const daysMap = { '1day': 1, '3days': 3, '5days': 5, '10days': 10 };
+    slaDeadline.setDate(slaDeadline.getDate() + daysMap[deadline]);
+
+    const stage2Data = await dbInsert('jobs', {
+      parent_job_id: jobId,
+      survey_type: surveyType,
+      job_type: 'new',
+      site_postcode: job.site_postcode,
+      site_street: job.site_street,
+      site_city: job.site_city,
+      dispatch_state: 'red',
+      urgency_state: deadline === '1day' ? '1day' : deadline === '3days' ? '3days' : deadline === '5days' ? '5days' : '10days',
+      billing_mode: job.billing_mode,
+      urgency_surcharge: urgency_surcharge || null,
+      sla_deadline: slaDeadline.toISOString(),
+      is_two_stage: false,
+      arranging_client_id: job.arranging_client_id,
+      end_client_name: job.end_client_name,
+      end_client_email: job.end_client_email,
+      billing_contact_name: job.billing_contact_name,
+      billing_contact_email: job.billing_contact_email,
+      billing_address: job.billing_address,
+      report_addressee_name: job.report_addressee_name,
+      report_addressee_address: job.report_addressee_address,
+      site_access_notes: job.site_access_notes,
+    });
+
+    const stage2Id = stage2Data[0].id;
+    document.getElementById('stage2Modal').remove();
+    showToast('Stage 2 job created');
+    setTimeout(() => {
+      window.location.href = `job-detail.html?id=${stage2Id}`;
+    }, 1000);
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
   }
