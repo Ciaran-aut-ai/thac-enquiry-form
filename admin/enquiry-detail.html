@@ -627,7 +627,6 @@ async function confirmConvert() {
       quoted_amount: amount ? parseFloat(amount) : null,
       agreed_amount: amount ? parseFloat(amount) : null,
       urgency_surcharge: urgency_surcharge || null,
-      estimated_tree_count: enquiry.tree_count_band || null,
       sla_deadline,
       is_two_stage: document.getElementById('cvtTwoStage').checked,
       arranging_client_id: clientId,

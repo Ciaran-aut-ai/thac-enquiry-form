@@ -1406,8 +1406,6 @@ async function createStage2Job() {
       survey_type: surveyType,
       job_type: 'new',
       site_postcode: job.site_postcode,
-      site_street: job.site_street,
-      site_city: job.site_city,
       dispatch_state: 'red',
       urgency_state: deadline === '1day' ? '1day' : deadline === '3days' ? '3days' : deadline === '5days' ? '5days' : '10days',
       billing_mode: job.billing_mode,
@@ -1422,7 +1420,6 @@ async function createStage2Job() {
       billing_address: job.billing_address,
       report_addressee_name: job.report_addressee_name,
       report_addressee_address: job.report_addressee_address,
-      site_access_notes: job.site_access_notes,
     });
 
     const stage2Id = stage2Data[0].id;
