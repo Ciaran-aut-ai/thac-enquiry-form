@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Dimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { Surveyor } from '../types';
@@ -21,6 +21,8 @@ function formatDate(dateStr: string | null): string {
 export default function ProfileScreen() {
   const [surveyor, setSurveyor] = useState<Surveyor | null>(null);
   const [loading,  setLoading]  = useState(true);
+  const [availability, setAvailability] = useState<Record<string, boolean>>({});
+  const [savingAvail, setSavingAvail] = useState(false);
 
   useFocusEffect(useCallback(() => { loadProfile(); }, []));
 
@@ -29,14 +31,50 @@ export default function ProfileScreen() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data } = await supabase
+    const { data: surveyorData } = await supabase
       .from('surveyors')
       .select('*')
       .eq('user_id', user.id)
       .single();
 
-    setSurveyor(data);
+    setSurveyor(surveyorData);
+
+    if (surveyorData?.id) {
+      const { data: availData } = await supabase
+        .from('surveyor_availability')
+        .select('date, is_available')
+        .eq('surveyor_id', surveyorData.id)
+        .gte('date', new Date().toISOString().split('T')[0]);
+
+      const availMap: Record<string, boolean> = {};
+      availData?.forEach(a => { availMap[a.date] = a.is_available; });
+      setAvailability(availMap);
+    }
+
     setLoading(false);
+  }
+
+  async function toggleAvailability(date: string) {
+    if (!surveyor) return;
+    setSavingAvail(true);
+
+    const newAvail = !availability[date];
+    setAvailability(prev => ({ ...prev, [date]: newAvail }));
+
+    try {
+      const { error } = await supabase.from('surveyor_availability').upsert({
+        surveyor_id: surveyor.id,
+        date,
+        is_available: newAvail,
+      }, { onConflict: 'surveyor_id,date' });
+
+      if (error) throw error;
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+      setAvailability(prev => ({ ...prev, [date]: !newAvail }));
+    } finally {
+      setSavingAvail(false);
+    }
   }
 
   async function signOut() {
@@ -89,12 +127,60 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Availability Calendar */}
+      <View style={s.card}>
+        <Text style={s.sectionTitle}>Availability Calendar</Text>
+        <Text style={s.calendarHint}>🟢 Available · 🔘 Unavailable</Text>
+        {renderCalendar()}
+      </View>
+
       <TouchableOpacity style={s.signOutBtn} onPress={signOut}>
         <Text style={s.signOutText}>Sign Out</Text>
       </TouchableOpacity>
 
     </ScrollView>
   );
+
+  function renderCalendar() {
+    const months: React.ReactNode[] = [];
+    const today = new Date();
+
+    for (let m = 0; m < 12; m++) {
+      const monthDate = new Date(today.getFullYear(), today.getMonth() + m, 1);
+      const monthName = monthDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+      const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+      const firstDay = monthDate.getDay();
+
+      const days: React.ReactNode[] = [];
+      for (let i = 0; i < firstDay; i++) days.push(<View key={`empty-${i}`} style={s.dayEmpty} />);
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const d = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
+        const dateStr = d.toISOString().split('T')[0];
+        const isAvail = availability[dateStr] !== false;
+
+        days.push(
+          <TouchableOpacity
+            key={dateStr}
+            style={[s.dayBtn, isAvail ? s.dayAvailable : s.dayUnavailable]}
+            onPress={() => toggleAvailability(dateStr)}
+            disabled={savingAvail}
+          >
+            <Text style={s.dayText}>{day}</Text>
+          </TouchableOpacity>
+        );
+      }
+
+      months.push(
+        <View key={`month-${m}`} style={s.monthContainer}>
+          <Text style={s.monthName}>{monthName}</Text>
+          <View style={s.monthGrid}>{days}</View>
+        </View>
+      );
+    }
+
+    return <View>{months}</View>;
+  }
 }
 
 const GREEN = '#1a3c2e';
@@ -116,4 +202,13 @@ const s = StyleSheet.create({
   hint:          { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24 },
   signOutBtn:    { backgroundColor: '#fee2e2', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
   signOutText:   { color: '#dc2626', fontWeight: '700', fontSize: 15 },
+  calendarHint:  { fontSize: 12, color: '#6b7280', marginBottom: 12 },
+  monthContainer:{ marginBottom: 20 },
+  monthName:     { fontSize: 14, fontWeight: '700', color: GREEN, marginBottom: 8 },
+  monthGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  dayBtn:        { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 6 },
+  dayAvailable:  { backgroundColor: '#bbf7d0' },
+  dayUnavailable:{ backgroundColor: '#f3f4f6' },
+  dayEmpty:      { width: '14.28%', aspectRatio: 1 },
+  dayText:       { fontSize: 12, fontWeight: '600', color: '#1a1a1a' },
 });
