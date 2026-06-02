@@ -1061,8 +1061,26 @@ function renderDispatchButton() {
 async function approveToMap() {
   if (!confirm('Approve this job to the surveyor map? It will become visible to eligible surveyors.')) return;
   try {
-    await dbUpdate('jobs', `id=eq.${jobId}`, { dispatch_state: 'red' });
+    // Fetch survey time and calculate surveyor pay if not already set
+    let surveyor_pay_amount = job.surveyor_pay_amount;
+
+    if (!surveyor_pay_amount && job.surveyor_id) {
+      const surveyor = await dbGet('surveyors', { id: `eq.${job.surveyor_id}` });
+      const surveyType = await dbGet('survey_types', { survey_type: `eq.${job.survey_type}` });
+
+      if (surveyor?.[0]?.hourly_rate && surveyType?.[0]?.hours_on_site) {
+        const baseHours = 1 + surveyType[0].hours_on_site; // 1 travel + survey hours
+        const basePay = baseHours * surveyor[0].hourly_rate;
+        surveyor_pay_amount = job.urgency_state === 'red' ? basePay * 1.2 : basePay;
+      }
+    }
+
+    await dbUpdate('jobs', `id=eq.${jobId}`, {
+      dispatch_state: 'red',
+      ...(surveyor_pay_amount && { surveyor_pay_amount })
+    });
     job.dispatch_state = 'red';
+    if (surveyor_pay_amount) job.surveyor_pay_amount = surveyor_pay_amount;
     showToast('Job approved — live on map 🔴');
     renderJob();
   } catch (e) {
