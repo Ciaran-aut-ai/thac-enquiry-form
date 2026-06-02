@@ -3,6 +3,17 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 
 serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('OK', {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    })
+  }
+
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
 
   const { enquiry_id, contact_email, contact_name, quoted_price, deadline_tier, survey_type, job_number, site_postcode } = await req.json()
