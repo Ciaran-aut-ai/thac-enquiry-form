@@ -321,9 +321,9 @@ function renderEnquiry() {
           <div class="card-title">Quick Actions</div>
           <div style="display:flex;flex-direction:column;gap:8px;">
             ${!isAmendment && enquiry.quoted_price ? `
-            <a href="${buildQuoteEmail()}" class="btn btn-primary w-100" style="justify-content:center;background:var(--green-dark);">
+            <button class="btn btn-primary w-100" style="justify-content:center;background:var(--green-dark);" onclick="sendQuoteEmail()">
               📧 Send Quote Email
-            </a>` : ''}
+            </button>` : ''}
             <a href="mailto:${enquiry.contact_email}?subject=Re: Your Arboricultural Survey Enquiry ${enquiry.job_number || ''}" class="btn btn-secondary w-100" style="justify-content:center;">
               📧 General Email
             </a>
@@ -452,41 +452,48 @@ async function saveEnqNote() {
 // SEND QUOTE EMAIL
 // ============================================================
 
-function buildQuoteEmail() {
-  const surveyLabel = getSurveyLabel(enquiry.survey_type);
-  const deadlineLabel = getDeadlineLabel(enquiry.deadline_tier);
-  const price = '£' + Number(enquiry.quoted_price).toLocaleString() + ' + VAT';
-  const subject = `Your Tree Survey Quote — ${enquiry.job_number || 'THAC'} | ${price}`;
+async function sendQuoteEmail() {
+  if (!enquiry.contact_email || !enquiry.quoted_price) {
+    showToast('Missing email or price', 'error');
+    return;
+  }
 
-  const acceptLink = `https://ciaran-aut-ai.github.io/thac-admin/accept-quote.html?id=${enquiryId}`;
-  const declineLink = `https://ciaran-aut-ai.github.io/thac-admin/accept-quote.html?id=${enquiryId}&action=decline`;
+  const btn = event.target;
+  btn.disabled = true;
+  const originalText = btn.innerText;
+  btn.innerText = 'Sending...';
 
-  const body = [
-    `Dear ${enquiry.contact_name || 'there'},`,
-    '',
-    `Thank you for your enquiry. Please find your quote below.`,
-    '',
-    `Reference:     ${enquiry.job_number || 'Pending'}`,
-    `Survey Type:   ${surveyLabel}`,
-    `Site Postcode: ${enquiry.site_postcode || '—'}`,
-    `Deadline:      ${deadlineLabel}`,
-    `Quote:         ${price}`,
-    '',
-    `To accept or decline this quote, simply click one of the links below:`,
-    '',
-    `Accept: ${acceptLink}`,
-    `Decline: ${declineLink}`,
-    '',
-    `Or reply to this email if you have any questions.`,
-    '',
-    `This quote is valid for 30 days from today. Payment is due 30 days from invoice date.`,
-    '',
-    `Kind regards,`,
-    `Trevor Heaps`,
-    `Trevor Heaps Arboricultural Consultancy Ltd.`,
-  ].join('\n');
+  try {
+    const response = await fetch('https://lemppaqgpntadeylzzwn.supabase.co/functions/v1/send-quote-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+      body: JSON.stringify({
+        enquiry_id: enquiryId,
+        contact_email: enquiry.contact_email,
+        contact_name: enquiry.contact_name,
+        quoted_price: enquiry.quoted_price,
+        deadline_tier: enquiry.deadline_tier,
+        survey_type: enquiry.survey_type,
+        job_number: enquiry.job_number,
+        site_postcode: enquiry.site_postcode,
+      }),
+    });
 
-  return `mailto:${enquiry.contact_email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to send email');
+    }
+
+    showToast('✅ Quote email sent successfully!');
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerText = originalText;
+  }
 }
 
 async function updateStatus() {
