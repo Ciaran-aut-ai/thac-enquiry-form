@@ -26,6 +26,8 @@ export default function JobDetailScreen() {
   const [savingNotes, setSavingNotes] = useState(false);
   const [files,      setFiles]      = useState<any[]>([]);
   const [uploading,  setUploading]  = useState(false);
+  const [surveyor,   setSurveyor]   = useState<any>(null);
+  const [surveyHours, setSurveyHours] = useState(1);
 
   useEffect(() => { loadData(); }, []);
 
@@ -35,12 +37,22 @@ export default function JobDetailScreen() {
 
     const [{ data: jobData }, { data: survData }, { data: filesData }] = await Promise.all([
       supabase.from('jobs').select('*').eq('id', jobId).single(),
-      supabase.from('surveyors').select('id').eq('user_id', user?.id || '').single(),
+      supabase.from('surveyors').select('*').eq('user_id', user?.id || '').single(),
       supabase.from('job_files').select('*').eq('job_id', jobId).order('uploaded_at', { ascending: false }),
     ]);
 
+    if (jobData?.survey_type) {
+      const { data: surveyTypeData } = await supabase
+        .from('survey_types')
+        .select('hours_on_site')
+        .eq('survey_type', jobData.survey_type)
+        .single();
+      setSurveyHours(surveyTypeData?.hours_on_site || 1);
+    }
+
     setJob(jobData);
     setSurveyorId(survData?.id || null);
+    setSurveyor(survData);
     setNotes(jobData?.surveyor_notes || '');
     setFiles(filesData || []);
     setLoading(false);
@@ -155,9 +167,21 @@ export default function JobDetailScreen() {
         <Text style={s.ref}>{job.reference || 'No reference'}</Text>
         <Text style={s.type}>{SURVEY_LABELS[job.survey_type] || job.survey_type}</Text>
         <Text style={s.postcode}>{job.site_postcode || '—'}</Text>
-        {job.surveyor_pay_amount
-          ? <Text style={s.pay}>Your pay: £{job.surveyor_pay_amount.toFixed(2)}</Text>
-          : null}
+
+        {surveyor && (
+          <View style={s.payBreakdown}>
+            <Text style={s.payLabel}>Your pay breakdown:</Text>
+            <Text style={s.payDetails}>
+              ({1} travel + {surveyHours} survey) × £{surveyor.hourly_rate}/hr = £{((1 + surveyHours) * surveyor.hourly_rate).toFixed(2)}
+            </Text>
+            {job.urgency_state === 'red' && (
+              <Text style={s.payBonus}>
+                🎯 Urgent next-day: +20% = £{((1 + surveyHours) * surveyor.hourly_rate * 1.2).toFixed(2)}
+              </Text>
+            )}
+          </View>
+        )}
+
         {job.sla_deadline
           ? <Text style={s.sla}>SLA: {new Date(job.sla_deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
           : null}
@@ -309,4 +333,8 @@ const s = StyleSheet.create({
   fileDelete:    { fontSize: 18, padding: 8 },
   uploadBtn:     { backgroundColor: '#e5f0eb', borderRadius: 8, padding: 12, alignItems: 'center', marginTop: 8 },
   uploadBtnText: { color: GREEN, fontWeight: '600', fontSize: 14 },
+  payBreakdown:  { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e5e7eb' },
+  payLabel:      { fontSize: 12, color: '#6b7280', fontWeight: '600', marginBottom: 4 },
+  payDetails:    { fontSize: 14, color: GREEN, fontWeight: '700', marginBottom: 4 },
+  payBonus:      { fontSize: 13, color: '#16a34a', fontWeight: '600', marginTop: 6 },
 });
