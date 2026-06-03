@@ -97,7 +97,7 @@ h1 { font-size: 24px; font-weight: 700; color: #1a3c2e; margin-bottom: 12px; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDWZbYZmPH8ECJjX7G8WQqxjPOBvzMqF9Q&libraries=drawing"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDWZbYZmPH8ECJjX7G8WQqxjPOBvzMqF9Q&libraries=drawing,geocoding"></script>
 </head>
 <body>
 <div class="card" id="card">
@@ -433,8 +433,52 @@ async function submitStep2(enquiryId, ref) {
     }
 
     await supabasePatch('enquiries', `id=eq.${enquiryId}`, updateData);
+
+    // Auto-create job from accepted quote
+    try {
+      const jobData = {
+        enquiry_id: enquiryId,
+        job_number: ref,
+        survey_type: currentEnquiry?.survey_type,
+        site_postcode: currentEnquiry?.site_postcode,
+        dispatch_state: 'pending_approval',
+        urgency_state: currentEnquiry?.deadline_tier === '1day' ? 'red' :
+                       currentEnquiry?.deadline_tier === '3days' ? 'orange' :
+                       currentEnquiry?.deadline_tier === '5days' ? 'yellow' : 'grey',
+        quoted_amount: currentEnquiry?.quoted_price,
+        agreed_amount: currentEnquiry?.quoted_price,
+        billing_contact_name: document.getElementById('billName').value.trim() || null,
+        billing_contact_email: document.getElementById('billEmail').value.trim() || null,
+        billing_address: billAddress,
+        report_addressee_name: finalReportName,
+        report_addressee_address: finalReportAddress,
+        report_title: document.getElementById('reportTitle').value.trim() || null,
+        site_access_notes: document.getElementById('accessDetails').value.trim() || null,
+        created_at: new Date().toISOString(),
+      };
+
+      const jobResp = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(jobData)
+      });
+
+      if (jobResp.ok) {
+        const createdJob = await jobResp.json();
+        console.log('Job created:', createdJob);
+      }
+    } catch (jobErr) {
+      console.error('Error creating job:', jobErr);
+      // Don't block the success flow if job creation fails
+    }
+
     showDone('🎉', 'All Done!',
-      `Thank you — we have everything we need. Trevor will be in touch shortly to confirm your survey date.`,
+      `Thank you — we have everything we need. Trevor will review and contact you shortly to confirm your survey date.`,
       { job_number: ref }
     );
   } catch (e) {
@@ -530,28 +574,38 @@ function initializeMap() {
     if (!container || map) return;
 
     const postcode = currentEnquiry?.postcode || 'UK';
+
+    // Check if Google Maps API is loaded
+    if (typeof google === 'undefined' || !google.maps) {
+      container.innerHTML = '<div style="padding:20px;text-align:center;color:#999;font-size:13px;">Google Maps not loaded. Please refresh the page.</div>';
+      return;
+    }
+
     const geocoder = new google.maps.Geocoder();
 
     geocoder.geocode({ address: postcode }, (results, status) => {
-      if (status === google.maps.GeocoderStatus.OK && results.length) {
-        const location = results[0].geometry.location;
-        map = new google.maps.Map(container, {
-          zoom: 16,
-          center: location,
-          mapTypeControl: false,
-        });
+      if (status !== google.maps.GeocoderStatus.OK || !results.length) {
+        // Default to UK center if geocoding fails
+        results = [{ geometry: { location: new google.maps.LatLng(54, -2) } }];
+      }
 
+      const location = results[0].geometry.location;
+      map = new google.maps.Map(container, {
+        zoom: 16,
+        center: location,
+        mapTypeControl: false,
+        gestureHandling: 'greedy',
+      });
+
+      // Initialize Drawing Manager
+      try {
         drawingManager = new google.maps.drawing.DrawingManager({
           drawingMode: google.maps.drawing.OverlayType.POLYGON,
           drawingControl: true,
           drawingControlOptions: {
             position: google.maps.ControlPosition.TOP_CENTER,
-            drawingModes: [google.maps.drawing.OverlayType.POLYGON],
+            drawingModes: [google.maps.drawing.OverlayType.POLYGON, google.maps.drawing.OverlayType.POLYLINE],
           },
-          markerOptions: { editable: true },
-          polylineOptions: { editable: true },
-          rectangleOptions: { editable: true },
-          circleOptions: { editable: true },
           polygonOptions: {
             editable: true,
             fillColor: '#1a3c2e',
@@ -570,6 +624,9 @@ function initializeMap() {
           }));
           drawingManager.setDrawingMode(null);
         });
+      } catch (err) {
+        console.error('Drawing Manager error:', err);
+        container.innerHTML += '<div style="padding:10px;font-size:12px;color:#dc2626;background:#fee2e2;border-radius:4px;margin-top:8px;">Drawing tools unavailable. Check Google Cloud Console setup.</div>';
       }
     });
 
