@@ -16,6 +16,8 @@ body {
   justify-content: center;
   padding: 24px;
 }
+#mapContainer { position: relative; }
+.map-label { position: absolute; top: 10px; left: 10px; background: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; color: #1a3c2e; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
 .card {
   background: white;
   border-radius: 16px;
@@ -95,6 +97,7 @@ h1 { font-size: 24px; font-weight: 700; color: #1a3c2e; margin-bottom: 12px; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDWZbYZmPH8ECJjX7G8WQqxjPOBvzMqF9Q&libraries=drawing"></script>
 </head>
 <body>
 <div class="card" id="card">
@@ -131,6 +134,10 @@ const DEADLINE_LABELS = {
 const params = new URLSearchParams(window.location.search);
 const id     = params.get('id');
 const action = params.get('action') || 'accept'; // 'accept' or 'decline'
+
+let map = null;
+let drawingManager = null;
+let polygonCoordinates = null;
 
 async function supabaseGet(table, query) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
@@ -223,7 +230,7 @@ function showAcceptConfirm(enq) {
         <span class="detail-value" style="color:#1a3c2e;font-size:16px;">${price}</span>
       </div>
     </div>
-    <button class="btn btn-accept" onclick="acceptQuote('${enq.id}', '${enq.job_number || ''}', '${(enq.contact_name||'').replace(/'/g,"\\'")}')">
+    <button class="btn btn-accept" onclick="acceptQuote('${enq.id}', '${enq.job_number || ''}', '${(enq.contact_name||'').replace(/'/g,"\\'")}', '${(enq.site_postcode||'').replace(/'/g,"\\'")}')">
       ✅ Accept Quote
     </button>
     <button class="btn btn-decline" onclick="window.location.search='?id=${enq.id}&action=decline'">
@@ -267,7 +274,7 @@ function showDeclineConfirm(enq) {
   `;
 }
 
-async function acceptQuote(enquiryId, ref, contactName) {
+async function acceptQuote(enquiryId, ref, contactName, postcode) {
   const btn = document.querySelector('.btn-accept');
   btn.textContent = 'Confirming…';
   btn.disabled = true;
@@ -275,7 +282,7 @@ async function acceptQuote(enquiryId, ref, contactName) {
     await supabasePatch('enquiries', `id=eq.${enquiryId}`,
       { status: 'accepted', accepted_at: new Date().toISOString() }
     );
-    showStep2(enquiryId, ref, contactName);
+    showStep2(enquiryId, ref, contactName, postcode);
   } catch (e) {
     btn.textContent = '✅ Accept Quote';
     btn.disabled = false;
@@ -299,7 +306,10 @@ function field(id, label, hint, type='text', placeholder='', rows=0, extraStyle=
     </div>`;
 }
 
-function showStep2(enquiryId, ref, contactName) {
+let currentEnquiry = null;
+
+function showStep2(enquiryId, ref, contactName, postcode) {
+  currentEnquiry = { id: enquiryId, postcode };
   document.getElementById('card').innerHTML = `
     <div class="logo">🌳</div>
     <div class="brand">Trevor Heaps Arboricultural Consultancy Ltd.</div>
@@ -371,6 +381,8 @@ function showStep2(enquiryId, ref, contactName) {
     </button>
     <div class="footer">This information is stored securely and only used to arrange your survey.</div>
   `;
+
+  initializeMap();
 }
 
 function toggleEndClient(val) {
@@ -400,7 +412,7 @@ async function submitStep2(enquiryId, ref) {
   const finalReportAddress = reportAddress || billAddress      || null;
 
   try {
-    await supabasePatch('enquiries', `id=eq.${enquiryId}`, {
+    const updateData = {
       billing_contact_name:     document.getElementById('billName').value.trim()  || null,
       billing_contact_email:    document.getElementById('billEmail').value.trim() || null,
       billing_address:          billAddress,
@@ -414,7 +426,13 @@ async function submitStep2(enquiryId, ref) {
       tc_accepted:              true,
       tc_accepted_at:           new Date().toISOString(),
       client_details_at:        new Date().toISOString(),
-    });
+    };
+
+    if (polygonCoordinates) {
+      updateData.site_boundary_polygon = JSON.stringify(polygonCoordinates);
+    }
+
+    await supabasePatch('enquiries', `id=eq.${enquiryId}`, updateData);
     showDone('🎉', 'All Done!',
       `Thank you — we have everything we need. Trevor will be in touch shortly to confirm your survey date.`,
       { job_number: ref }
@@ -494,6 +512,70 @@ function showTerms() {
     '• Any additional work identified during the survey will be quoted separately\n' +
     '• The report is prepared based on information provided and site conditions on the survey date\n\n' +
     'For full terms and conditions, please contact Trevor Heaps Arboricultural Consultancy Ltd.');
+}
+
+function updateAcceptanceTime() {
+  const timeEl = document.getElementById('acceptTime');
+  if (timeEl) {
+    const now = new Date();
+    const format = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) +
+                   ' at ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    timeEl.textContent = format;
+  }
+}
+
+function initializeMap() {
+  setTimeout(() => {
+    const container = document.getElementById('mapContainer');
+    if (!container || map) return;
+
+    const postcode = currentEnquiry?.postcode || 'UK';
+    const geocoder = new google.maps.Geocoder();
+
+    geocoder.geocode({ address: postcode }, (results, status) => {
+      if (status === google.maps.GeocoderStatus.OK && results.length) {
+        const location = results[0].geometry.location;
+        map = new google.maps.Map(container, {
+          zoom: 16,
+          center: location,
+          mapTypeControl: false,
+        });
+
+        drawingManager = new google.maps.drawing.DrawingManager({
+          drawingMode: google.maps.drawing.OverlayType.POLYGON,
+          drawingControl: true,
+          drawingControlOptions: {
+            position: google.maps.ControlPosition.TOP_CENTER,
+            drawingModes: [google.maps.drawing.OverlayType.POLYGON],
+          },
+          markerOptions: { editable: true },
+          polylineOptions: { editable: true },
+          rectangleOptions: { editable: true },
+          circleOptions: { editable: true },
+          polygonOptions: {
+            editable: true,
+            fillColor: '#1a3c2e',
+            fillOpacity: 0.2,
+            strokeColor: '#1a3c2e',
+            strokeWeight: 2,
+          },
+        });
+        drawingManager.setMap(map);
+
+        google.maps.event.addListener(drawingManager, 'polygoncomplete', (polygon) => {
+          const path = polygon.getPath();
+          polygonCoordinates = path.getArray().map(point => ({
+            lat: point.lat(),
+            lng: point.lng(),
+          }));
+          drawingManager.setDrawingMode(null);
+        });
+      }
+    });
+
+    updateAcceptanceTime();
+    setInterval(updateAcceptanceTime, 60000);
+  }, 100);
 }
 
 function updateAcceptanceTime() {
