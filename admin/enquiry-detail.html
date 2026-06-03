@@ -292,6 +292,9 @@ function renderEnquiry() {
           </div>
         </div>
 
+        <!-- Acceptance Details (if quote accepted) -->
+        ${enquiry.status === 'accepted' ? renderEnquiryAcceptanceDetails() : ''}
+
       </div>
 
       <!-- Right column -->
@@ -422,6 +425,83 @@ function renderEnquiry() {
       </div>
     </div>
   `;
+}
+
+// ============================================================
+// ACCEPTANCE DETAILS
+// ============================================================
+
+function renderEnquiryAcceptanceDetails() {
+  if (!enquiry || (!enquiry.billing_contact_name && !enquiry.access_details && !enquiry.parking_details)) {
+    return '';
+  }
+
+  return `
+    <div class="card">
+      <div class="card-title" style="cursor:pointer;" onclick="toggleEnquiryAcceptanceDetails()">
+        <span id="enquiryAcceptanceToggle">▼</span> Client & Site Details
+      </div>
+      <div id="enquiryAcceptanceContent" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+          ${enquiry.billing_contact_name ? `
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Invoice Contact</div>
+              <div style="font-size:13px;font-weight:600;color:var(--text);">${enquiry.billing_contact_name}</div>
+              ${enquiry.billing_contact_email ? `<div style="font-size:12px;color:var(--text-muted);">${enquiry.billing_contact_email}</div>` : ''}
+              ${enquiry.billing_address ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px;white-space:pre-wrap;">${enquiry.billing_address}</div>` : ''}
+            </div>
+          ` : ''}
+          ${enquiry.end_client_name && enquiry.end_client_name !== enquiry.billing_contact_name ? `
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">End Client</div>
+              <div style="font-size:13px;font-weight:600;color:var(--text);">${enquiry.end_client_name}</div>
+              ${enquiry.end_client_email ? `<div style="font-size:12px;color:var(--text-muted);">${enquiry.end_client_email}</div>` : ''}
+            </div>
+          ` : ''}
+          ${enquiry.report_addressee_name ? `
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Report Addressee</div>
+              <div style="font-size:13px;font-weight:600;color:var(--text);">${enquiry.report_addressee_name}</div>
+              ${enquiry.report_title ? `<div style="font-size:12px;color:var(--text-muted);">${enquiry.report_title}</div>` : ''}
+              ${enquiry.report_addressee_address ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px;white-space:pre-wrap;">${enquiry.report_addressee_address}</div>` : ''}
+            </div>
+          ` : ''}
+        </div>
+        ${enquiry.access_details ? `
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Access Details</div>
+            <div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${enquiry.access_details}</div>
+          </div>
+        ` : ''}
+        ${enquiry.parking_details ? `
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Parking Details</div>
+            <div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${enquiry.parking_details}</div>
+          </div>
+        ` : ''}
+        ${enquiry.site_boundary_polygon ? `
+          <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Site Boundary</div>
+            <div style="font-size:12px;color:var(--text-muted);padding:10px;background:var(--bg);border-radius:8px;">
+              Polygon with ${JSON.parse(enquiry.site_boundary_polygon).length} points defined
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function toggleEnquiryAcceptanceDetails() {
+  const content = document.getElementById('enquiryAcceptanceContent');
+  const toggle = document.getElementById('enquiryAcceptanceToggle');
+  if (content.style.display === 'none') {
+    content.style.display = 'block';
+    toggle.textContent = '▼';
+  } else {
+    content.style.display = 'none';
+    toggle.textContent = '▶';
+  }
 }
 
 // ============================================================

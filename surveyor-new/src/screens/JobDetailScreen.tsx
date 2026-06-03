@@ -20,6 +20,7 @@ export default function JobDetailScreen() {
   const { params: { jobId } } = useRoute<RouteProps>();
   const nav = useNavigation();
   const [job,        setJob]        = useState<Job | null>(null);
+  const [enquiry,    setEnquiry]    = useState<any>(null);
   const [surveyorId, setSurveyorId] = useState<string | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [notes,      setNotes]      = useState('');
@@ -28,8 +29,33 @@ export default function JobDetailScreen() {
   const [uploading,  setUploading]  = useState(false);
   const [surveyor,   setSurveyor]   = useState<any>(null);
   const [surveyHours, setSurveyHours] = useState(1);
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
 
   useEffect(() => { loadData(); }, []);
+
+  useEffect(() => {
+    if (!job?.allocated_surveyor_id || job?.allocation_rejected_at) return;
+
+    const updateCountdown = () => {
+      const allocatedAt = new Date(job.allocated_at).getTime();
+      const timeoutMs = (job.allocation_timeout_hours || 48) * 60 * 60 * 1000;
+      const expiresAt = allocatedAt + timeoutMs;
+      const now = new Date().getTime();
+      const remaining = expiresAt - now;
+
+      if (remaining <= 0) {
+        setTimeRemaining('Expired');
+      } else {
+        const hours = Math.floor(remaining / (60 * 60 * 1000));
+        const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+        setTimeRemaining(`${hours}h ${minutes}m`);
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 60000);
+    return () => clearInterval(interval);
+  }, [job]);
 
   async function loadData() {
     setLoading(true);
@@ -40,6 +66,16 @@ export default function JobDetailScreen() {
       supabase.from('surveyors').select('*').eq('user_id', user?.id || '').single(),
       supabase.from('job_files').select('*').eq('job_id', jobId).order('uploaded_at', { ascending: false }),
     ]);
+
+    // Load enquiry acceptance details if job has enquiry_id
+    if (jobData?.enquiry_id) {
+      const { data: enqData } = await supabase
+        .from('enquiries')
+        .select('contact_name,contact_phone,access_details,parking_details,report_title,site_boundary_polygon')
+        .eq('id', jobData.enquiry_id)
+        .single();
+      setEnquiry(enqData);
+    }
 
     if (jobData?.survey_type) {
       const { data: surveyTypeData } = await supabase
@@ -145,6 +181,35 @@ export default function JobDetailScreen() {
     ]);
   }
 
+  async function claimAllocatedJob() {
+    if (!surveyorId) { Alert.alert('Error', 'Surveyor profile not found.'); return; }
+    Alert.alert('Claim Job', 'Confirm you want to claim this allocated job?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Claim', onPress: async () => {
+        const { error } = await supabase.from('jobs').update({
+          surveyor_id: surveyorId,
+          dispatch_state: 'orange',
+        }).eq('id', jobId);
+        if (error) Alert.alert('Error', error.message);
+        else { Alert.alert('✅ Claimed!', 'Job is assigned to you.'); loadData(); }
+      }},
+    ]);
+  }
+
+  async function rejectAllocatedJob() {
+    Alert.alert('Reject Job', 'This will release the job back to other surveyors.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Reject', onPress: async () => {
+        const { error } = await supabase.from('jobs').update({
+          allocated_surveyor_id: null,
+          allocation_rejected_at: new Date().toISOString(),
+        }).eq('id', jobId);
+        if (error) Alert.alert('Error', error.message);
+        else { Alert.alert('Done', 'Job returned to available list.'); nav.goBack(); }
+      }, style: 'destructive' },
+    ]);
+  }
+
   async function saveNotes() {
     setSavingNotes(true);
     const { error } = await supabase.from('jobs').update({ surveyor_notes: notes }).eq('id', jobId);
@@ -162,11 +227,34 @@ export default function JobDetailScreen() {
   return (
     <ScrollView style={s.container} contentContainerStyle={{ padding: 16, gap: 12 }}>
 
+      {/* Allocated Job Alert */}
+      {job.allocated_surveyor_id && !job.allocation_rejected_at && job.dispatch_state !== 'orange' && (
+        <View style={s.allocatedBanner}>
+          <Text style={s.allocatedTitle}>🚨 ALLOCATED TO YOU - ACTION REQUIRED</Text>
+          <Text style={s.allocatedText}>This job has been specifically assigned to you. You must claim or reject it.</Text>
+          <Text style={s.allocatedCountdown}>⏱ Respond within: {timeRemaining || 'calculating...'}</Text>
+          <View style={s.allocatedActions}>
+            <TouchableOpacity style={s.allocatedClaimBtn} onPress={claimAllocatedJob}>
+              <Text style={s.allocatedClaimText}>✅ CLAIM JOB</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.allocatedRejectBtn} onPress={rejectAllocatedJob}>
+              <Text style={s.allocatedRejectText}>❌ REJECT</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* Header */}
       <View style={s.card}>
         <Text style={s.ref}>{job.reference || 'No reference'}</Text>
         <Text style={s.type}>{SURVEY_LABELS[job.survey_type] || job.survey_type}</Text>
         <Text style={s.postcode}>{job.site_postcode || '—'}</Text>
+
+        {job.tree_count_band && (
+          <View style={s.treeCountBadge}>
+            <Text style={s.treeCountText}>🌳 {job.tree_count_band} trees</Text>
+          </View>
+        )}
 
         {surveyor && (
           <View style={s.payBreakdown}>
@@ -195,6 +283,43 @@ export default function JobDetailScreen() {
           {job.site_location_tag
             ? <Text style={s.tag}>{job.site_location_tag}</Text>
             : null}
+        </View>
+      ) : null}
+
+      {/* Client & Site Details */}
+      {enquiry && (enquiry.access_details || enquiry.parking_details || enquiry.contact_name || enquiry.report_title) ? (
+        <View style={s.card}>
+          <Text style={s.sectionTitle}>Client & Site Details</Text>
+          {enquiry.contact_name && (
+            <View style={{marginBottom: 10}}>
+              <Text style={s.label}>Contact</Text>
+              <Text style={s.body}>{enquiry.contact_name}</Text>
+              {enquiry.contact_phone && <Text style={s.body}>{enquiry.contact_phone}</Text>}
+            </View>
+          )}
+          {enquiry.report_title && (
+            <View style={{marginBottom: 10}}>
+              <Text style={s.label}>Report Title</Text>
+              <Text style={s.body}>{enquiry.report_title}</Text>
+            </View>
+          )}
+          {enquiry.access_details && (
+            <View style={{marginBottom: 10}}>
+              <Text style={s.label}>Access Details</Text>
+              <Text style={s.body}>{enquiry.access_details}</Text>
+            </View>
+          )}
+          {enquiry.parking_details && (
+            <View style={{marginBottom: 10}}>
+              <Text style={s.label}>Parking</Text>
+              <Text style={s.body}>{enquiry.parking_details}</Text>
+            </View>
+          )}
+          {enquiry.site_boundary_polygon && (
+            <Text style={[s.body, {fontSize: 12, color: '#999'}]}>
+              📍 Site boundary polygon defined
+            </Text>
+          )}
         </View>
       ) : null}
 
@@ -312,6 +437,7 @@ const s = StyleSheet.create({
   pay:           { fontSize: 16, fontWeight: '700', color: '#16a34a', marginTop: 8 },
   sla:           { fontSize: 13, color: '#6b7280', marginTop: 4 },
   sectionTitle:  { fontSize: 14, fontWeight: '700', color: GREEN, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  label:         { fontSize: 12, fontWeight: '600', color: '#6b7280', marginBottom: 4, textTransform: 'uppercase' },
   body:          { fontSize: 14, color: '#374151', lineHeight: 20 },
   tag:           { fontSize: 12, color: '#6b7280', marginTop: 6, fontStyle: 'italic' },
   docBtn:        { backgroundColor: '#f0f7f4', borderRadius: 8, padding: 12, marginBottom: 8 },
@@ -337,4 +463,15 @@ const s = StyleSheet.create({
   payLabel:      { fontSize: 12, color: '#6b7280', fontWeight: '600', marginBottom: 4 },
   payDetails:    { fontSize: 14, color: GREEN, fontWeight: '700', marginBottom: 4 },
   payBonus:      { fontSize: 13, color: '#16a34a', fontWeight: '600', marginTop: 6 },
+  treeCountBadge: { backgroundColor: '#f0fdf4', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, marginVertical: 8 },
+  treeCountText:  { fontSize: 15, fontWeight: '700', color: '#15803d' },
+  allocatedBanner: { backgroundColor: '#fee2e2', borderRadius: 12, padding: 16, borderLeftWidth: 4, borderLeftColor: '#dc2626', marginBottom: 12 },
+  allocatedTitle:  { fontSize: 16, fontWeight: '700', color: '#991b1b', marginBottom: 8 },
+  allocatedText:   { fontSize: 14, color: '#7f1d1d', marginBottom: 8, lineHeight: 20 },
+  allocatedCountdown: { fontSize: 15, fontWeight: '700', color: '#dc2626', marginBottom: 12 },
+  allocatedActions: { flexDirection: 'row', gap: 10 },
+  allocatedClaimBtn: { flex: 1, backgroundColor: '#16a34a', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  allocatedClaimText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  allocatedRejectBtn: { flex: 1, backgroundColor: '#fff', borderRadius: 8, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#dc2626' },
+  allocatedRejectText: { color: '#dc2626', fontWeight: '700', fontSize: 14 },
 });
