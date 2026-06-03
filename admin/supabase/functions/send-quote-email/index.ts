@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 
+console.log('Function initialized. RESEND_API_KEY set:', !!RESEND_API_KEY)
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -9,21 +11,32 @@ serve(async (req) => {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey',
       },
     })
   }
 
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', {
+      status: 405,
+      headers: { 'Access-Control-Allow-Origin': '*' }
+    })
+  }
 
   const { enquiry_id, contact_email, contact_name, quoted_price, deadline_tier, survey_type, job_number, site_postcode } = await req.json()
 
   if (!contact_email || !quoted_price) {
-    return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 })
+    return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+      status: 400,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      }
+    })
   }
 
-  const acceptLink = `https://ciaran-aut-ai.github.io/thac-admin/accept-quote.html?id=${enquiry_id}`
-  const declineLink = `https://ciaran-aut-ai.github.io/thac-admin/accept-quote.html?id=${enquiry_id}&action=decline`
+  const acceptLink = `https://ciaran-aut-ai.github.io/thac-enquiry-form/admin/accept-quote.html?id=${enquiry_id}`
+  const declineLink = `https://ciaran-aut-ai.github.io/thac-enquiry-form/admin/accept-quote.html?id=${enquiry_id}&action=decline`
   const price = '£' + Number(quoted_price).toLocaleString() + ' + VAT'
 
   const emailHtml = `
@@ -63,6 +76,7 @@ serve(async (req) => {
   `
 
   try {
+    console.log('Sending email to:', contact_email)
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -77,20 +91,29 @@ serve(async (req) => {
       }),
     })
 
+    console.log('Resend response status:', response.status)
     if (!response.ok) {
       const error = await response.text()
+      console.log('Resend error:', error)
       throw new Error(`Resend API error: ${error}`)
     }
+    console.log('Email sent successfully')
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      }
     })
   } catch (error) {
     console.error('Email error:', error)
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      }
     })
   }
 })

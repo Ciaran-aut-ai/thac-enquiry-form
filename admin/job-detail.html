@@ -89,6 +89,38 @@
   </div>
 </div>
 
+<!-- Allocate Job Modal -->
+<div class="modal-overlay" id="allocateModal" style="display:none">
+  <div class="modal">
+    <div class="modal-title">Allocate to Surveyor</div>
+    <div class="modal-sub">Manually assign this job to a specific surveyor with a response deadline.</div>
+    <div class="form-group">
+      <label>Select Surveyor <span class="req">*</span></label>
+      <select class="form-control" id="allocSurveyor">
+        <option value="">— Choose surveyor —</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Response Timeout <span class="req">*</span></label>
+      <select class="form-control" id="allocTimeout">
+        <option value="12">12 hours</option>
+        <option value="24">24 hours</option>
+        <option value="48" selected>48 hours (2 days)</option>
+        <option value="72">72 hours (3 days)</option>
+        <option value="custom">Custom hours...</option>
+      </select>
+    </div>
+    <div class="form-group" id="customTimeoutGroup" style="display:none;">
+      <label>Hours <span class="req">*</span></label>
+      <input type="number" class="form-control" id="allocCustomTimeout" min="1" max="168" placeholder="e.g. 48">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeAllocateModal()" style="flex:1;justify-content:center;">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAllocate()" style="flex:2;justify-content:center;">✅ Allocate</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/supabase.js"></script>
 <script src="js/thac.js"></script>
 <script>
@@ -137,6 +169,11 @@ async function loadJob() {
     }
 
     renderJob();
+
+    // Auto-geocode postcode if coordinates missing
+    if (job.site_postcode && !job.site_lat) {
+      setTimeout(() => geocodePostcode(true), 500); // Silent auto-geocode after a short delay
+    }
 
     // Load uploaded files after render
     await loadUploadedFiles();
@@ -227,8 +264,12 @@ function renderInvoiceActions() {
     // Single invoice
     if (!job.invoice1_date) {
       buttons.push(`
-        <button class="btn btn-primary w-100" style="justify-content:center;" onclick="openInvoiceModal(1)">
-          🧾 Raise Invoice
+        <button class="btn btn-primary w-100" style="justify-content:center;background:var(--green-dark);" onclick="quickInvoice(1)">
+          📋 Mark Invoiced
+        </button>`);
+      buttons.push(`
+        <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="openInvoiceModal(1)">
+          🧾 Custom Invoice
         </button>`);
     } else if (!job.invoice1_paid) {
       buttons.push(`
@@ -356,6 +397,7 @@ function renderJob() {
         <div class="card">
           <div class="card-title">
             Financial
+            ${!job.invoiced ? `<button class="btn btn-primary btn-sm" style="background:var(--green-dark);" onclick="markInvoiced()">✅ Mark Invoiced</button>` : `<span style="font-size:12px;color:var(--green-dark);font-weight:600;">✅ Invoiced ${job.invoiced_at ? formatDate(job.invoiced_at) : ''}</span>`}
             <button id="editFinBtn" class="btn btn-secondary btn-sm" onclick="toggleFinancialEdit()">Edit</button>
           </div>
           <div id="financialView">
@@ -645,6 +687,7 @@ function renderJob() {
         <div class="card">
           <div class="card-title">Quick Actions</div>
           <div style="display:flex;flex-direction:column;gap:8px;">
+            ${renderAllocationStatus()}
             ${renderDispatchButton()}
             ${renderStage2Button()}
             ${renderInvoiceActions()}
@@ -785,6 +828,132 @@ async function submitInvoice() {
 }
 
 // ============================================================
+// MARK INVOICED (Toggle + Record Date)
+// ============================================================
+
+async function markInvoiced() {
+  try {
+    const updates = {
+      invoiced: true,
+      invoiced_at: new Date().toISOString()
+    };
+
+    await dbUpdate('jobs', `id=eq.${jobId}`, updates);
+    Object.assign(job, updates);
+    showToast('✅ Job marked as invoiced');
+    renderJob();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// JOB ALLOCATION
+// ============================================================
+
+function renderAllocationStatus() {
+  if (!job.allocated_surveyor_id) {
+    return `<button class="btn btn-secondary w-100" style="justify-content:center;" onclick="openAllocateModal()">
+      📌 Allocate to Surveyor
+    </button>`;
+  }
+
+  const hoursLeft = job.allocation_timeout_hours;
+  const allocatedAt = new Date(job.allocated_at);
+  const expiresAt = new Date(allocatedAt.getTime() + hoursLeft * 60 * 60 * 1000);
+  const now = new Date();
+  const hoursRemaining = Math.max(0, (expiresAt - now) / (60 * 60 * 1000));
+
+  const status = hoursRemaining > 0
+    ? `🕐 Allocated · ${Math.ceil(hoursRemaining)}h remaining`
+    : `⏰ Allocation expired`;
+
+  return `
+    <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:12px;">
+      <div style="font-size:13px;color:#92400e;font-weight:600;margin-bottom:4px;">${status}</div>
+      <button class="btn btn-secondary btn-sm" onclick="openAllocateModal()" style="justify-content:center;">
+        🔄 Change Allocation
+      </button>
+    </div>`;
+}
+
+async function openAllocateModal() {
+  // Load surveyors for dropdown
+  try {
+    const survs = await dbGet('surveyors', { 'select': 'id,full_name', 'order': 'full_name.asc' });
+    const options = survs.map(s => `<option value="${s.id}">${s.full_name}</option>`).join('');
+    document.getElementById('allocSurveyor').innerHTML = `<option value="">— Choose surveyor —</option>${options}`;
+
+    // Pre-select if already allocated
+    if (job.allocated_surveyor_id) {
+      document.getElementById('allocSurveyor').value = job.allocated_surveyor_id;
+      const hoursLeft = job.allocation_timeout_hours;
+      const timeoutSelect = document.getElementById('allocTimeout');
+      if (timeoutSelect.querySelector(`option[value="${hoursLeft}"]`)) {
+        timeoutSelect.value = hoursLeft;
+      } else {
+        timeoutSelect.value = 'custom';
+        document.getElementById('allocCustomTimeout').value = hoursLeft;
+        document.getElementById('customTimeoutGroup').style.display = 'block';
+      }
+    }
+  } catch (e) {
+    showToast('Error loading surveyors: ' + e.message, 'error');
+    return;
+  }
+
+  document.getElementById('allocateModal').style.display = 'flex';
+}
+
+function closeAllocateModal() {
+  document.getElementById('allocateModal').style.display = 'none';
+}
+
+document.addEventListener('change', function(e) {
+  if (e.target.id === 'allocTimeout') {
+    const customGroup = document.getElementById('customTimeoutGroup');
+    customGroup.style.display = e.target.value === 'custom' ? 'block' : 'none';
+  }
+});
+
+async function submitAllocate() {
+  const surveyorId = document.getElementById('allocSurveyor').value;
+  let timeoutHours = document.getElementById('allocTimeout').value;
+
+  if (!surveyorId) {
+    showToast('Please select a surveyor', 'error');
+    return;
+  }
+
+  if (timeoutHours === 'custom') {
+    timeoutHours = parseInt(document.getElementById('allocCustomTimeout').value);
+    if (!timeoutHours || timeoutHours < 1) {
+      showToast('Please enter valid hours', 'error');
+      return;
+    }
+  } else {
+    timeoutHours = parseInt(timeoutHours);
+  }
+
+  try {
+    const updates = {
+      allocated_surveyor_id: surveyorId,
+      allocated_at: new Date().toISOString(),
+      allocation_timeout_hours: timeoutHours,
+      allocation_rejected_at: null,
+    };
+
+    await dbUpdate('jobs', `id=eq.${jobId}`, updates);
+    Object.assign(job, updates);
+    closeAllocateModal();
+    showToast('✅ Job allocated to surveyor');
+    renderJob();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
 // MARK PAID MODAL
 // ============================================================
 
@@ -892,20 +1061,24 @@ async function saveSurveyDate() {
 // GEOCODING
 // ============================================================
 
-async function geocodePostcode() {
-  if (!job.site_postcode) { showToast('No postcode on this job', 'error'); return; }
+async function geocodePostcode(silent = false) {
+  if (!job.site_postcode) {
+    if (!silent) showToast('No postcode on this job', 'error');
+    return;
+  }
   if (!GOOGLE_MAPS_KEY || GOOGLE_MAPS_KEY === 'YOUR_GOOGLE_MAPS_KEY_HERE') {
-    showToast('Google Maps API key not configured', 'error'); return;
+    if (!silent) showToast('Google Maps API key not configured', 'error');
+    return;
   }
 
-  showToast('Geocoding…', 'warning');
+  if (!silent) showToast('Geocoding…', 'warning');
   try {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(job.site_postcode)}&key=${GOOGLE_MAPS_KEY}`;
     const res  = await fetch(url);
     const data = await res.json();
 
     if (data.status !== 'OK' || !data.results.length) {
-      showToast('Could not geocode postcode: ' + (data.status || 'unknown error'), 'error');
+      if (!silent) showToast('Could not geocode postcode: ' + (data.status || 'unknown error'), 'error');
       return;
     }
 
@@ -913,10 +1086,10 @@ async function geocodePostcode() {
     await dbUpdate('jobs', `id=eq.${jobId}`, { site_lat: lat, site_lng: lng });
     job.site_lat = lat;
     job.site_lng = lng;
-    showToast('Coordinates saved — job will appear on the map');
+    if (!silent) showToast('Coordinates saved — job will appear on the map');
     renderJob();
   } catch (e) {
-    showToast('Geocoding error: ' + e.message, 'error');
+    if (!silent) showToast('Geocoding error: ' + e.message, 'error');
   }
 }
 

@@ -468,7 +468,6 @@ async function sendQuoteEmail() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getAuthToken()}`,
       },
       body: JSON.stringify({
         enquiry_id: enquiryId,

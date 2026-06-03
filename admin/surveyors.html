@@ -56,11 +56,40 @@ async function init() {
 
 async function loadSurveyors() {
   try {
-    const data = await dbGet('surveyors', {
+    const surveyors = await dbGet('surveyors', {
       'select': 'id,full_name,email,phone,hourly_rate,radius_miles,pi_expiry_date,pl_expiry_date,dbs_expiry_date,is_active,created_at',
       'order': 'full_name.asc'
     });
-    allSurveyors = data || [];
+
+    // Load all invoiced jobs for current year to calculate earnings
+    const currentYear = new Date().getFullYear();
+    const startOfYear = `${currentYear}-01-01`;
+    const endOfYear = `${currentYear}-12-31`;
+
+    const jobs = await dbGet('jobs', {
+      'select': 'id,assigned_surveyor_id,agreed_amount,invoiced,invoiced_at',
+      'invoiced': `eq.true`,
+      'invoiced_at': `gte.${startOfYear}`,
+    });
+
+    // Calculate earnings per surveyor
+    const earningsBysSurveyor = {};
+    (jobs || []).forEach(job => {
+      if (job.assigned_surveyor_id) {
+        if (!earningsBysSurveyor[job.assigned_surveyor_id]) {
+          earningsBysSurveyor[job.assigned_surveyor_id] = { jobs: 0, total: 0 };
+        }
+        earningsBysSurveyor[job.assigned_surveyor_id].jobs += 1;
+        earningsBysSurveyor[job.assigned_surveyor_id].total += Number(job.agreed_amount) || 0;
+      }
+    });
+
+    // Attach earnings to each surveyor
+    allSurveyors = (surveyors || []).map(s => ({
+      ...s,
+      earnings: earningsBysSurveyor[s.id] || { jobs: 0, total: 0 }
+    }));
+
     renderTable();
   } catch (e) {
     document.getElementById('surveyorsTable').innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
@@ -135,6 +164,8 @@ function renderTable() {
       <td><span class="badge ${pi.cls}">${pi.label}</span></td>
       <td><span class="badge ${pl.cls}">${pl.label}</span></td>
       <td><span class="badge ${dbs.cls}">${dbs.label}</span></td>
+      <td style="font-weight:600;color:var(--green-mid);">${s.earnings.jobs} jobs</td>
+      <td style="font-weight:600;font-size:15px;color:var(--green-dark);">£${Number(s.earnings.total).toLocaleString()}</td>
       <td>${active}</td>
     </tr>`;
   }).join('');
@@ -149,6 +180,8 @@ function renderTable() {
           <th>PI Insurance</th>
           <th>PL Insurance</th>
           <th>DBS</th>
+          <th>Jobs (YTD)</th>
+          <th>Earnings (YTD)</th>
           <th>Status</th>
         </tr>
       </thead>
