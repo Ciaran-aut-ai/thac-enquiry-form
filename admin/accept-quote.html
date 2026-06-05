@@ -450,7 +450,7 @@ async function submitStep2(enquiryId, ref) {
         report_addressee_name: finalReportName,
         report_addressee_address: finalReportAddress,
         report_title: document.getElementById('reportTitle').value.trim() || null,
-        survey_boundary_polygon: polygonCoordinates ? JSON.stringify(polygonCoordinates) : null,
+        site_boundary_polygon: polygonCoordinates ? JSON.stringify(polygonCoordinates) : null,
       };
 
       console.log('Creating job with data:', jobData);
