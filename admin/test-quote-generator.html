@@ -81,8 +81,11 @@
     <div class="status" id="status"></div>
   </div>
 
-  <script src="js/supabase.js"></script>
   <script>
+    const SUPABASE_URL = 'https://lemppaqgpntadeylzzwn.supabase.co';
+    const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlbXBwYXFncG50YWRleWx6enduIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTMxNTM5MywiZXhwIjoyMDk0ODkxMzkzfQ.zrQxUbZhhma_gCtQTAgAAJ4fRJV9aK19Jr9dr66fCEk';
+    const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlbXBwYXFncG50YWRleWx6enduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMTUzOTMsImV4cCI6MjA5NDg5MTM5M30.SU2M7e5OSwqIjRJfM15uKLHTqSrLadcY46MR51twosU';
+
     async function generateTest() {
       const btn = document.getElementById('generateBtn');
       const status = document.getElementById('status');
@@ -93,25 +96,41 @@
       status.textContent = '';
 
       try {
-        // Create enquiry
-        const enquiry = await dbInsert('enquiries', {
-          contact_name: 'Ciaran Murphy',
-          contact_email: 'ciaran@aut-ai.com',
-          contact_phone: '07700 900123',
-          company: 'Test Company',
-          survey_type: document.getElementById('surveyType').value,
-          site_postcode: document.getElementById('postcode').value.toUpperCase(),
-          deadline_tier: document.getElementById('deadline').value,
-          quoted_price: parseFloat(document.getElementById('price').value),
-          status: 'quoted',
-          job_number: 'TEST-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-          tree_count_band: '20-50',
-          enquiry_type: 'new',
-          submitted_at: new Date().toISOString()
+        // Create enquiry using Service Role Key (full permissions)
+        const jobNumber = 'TEST-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+
+        const enquiryResponse = await fetch(`${SUPABASE_URL}/rest/v1/enquiries`, {
+          method: 'POST',
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            contact_name: 'Ciaran Murphy',
+            contact_email: 'ciaran@aut-ai.com',
+            contact_phone: '07700 900123',
+            company: 'Test Company',
+            survey_type: document.getElementById('surveyType').value,
+            site_postcode: document.getElementById('postcode').value.toUpperCase(),
+            deadline_tier: document.getElementById('deadline').value,
+            quoted_price: parseFloat(document.getElementById('price').value),
+            status: 'quoted',
+            job_number: jobNumber,
+            tree_count_band: '20-50',
+            enquiry_type: 'new',
+            submitted_at: new Date().toISOString()
+          })
         });
 
-        const enquiryId = enquiry[0].id;
-        const jobNumber = enquiry[0].job_number;
+        if (!enquiryResponse.ok) {
+          const error = await enquiryResponse.json();
+          throw new Error(error.message || 'Failed to create enquiry');
+        }
+
+        const enquiries = await enquiryResponse.json();
+        const enquiryId = enquiries[0].id;
 
         // Send quote email
         const emailResponse = await fetch('https://lemppaqgpntadeylzzwn.supabase.co/functions/v1/send-quote-email', {
