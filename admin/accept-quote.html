@@ -97,7 +97,10 @@ h1 { font-size: 24px; font-weight: 700; color: #1a3c2e; margin-bottom: 12px; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBf06LywaBHDNOCzj4Z8Cm0W6XAwk7iETc&libraries=drawing,geocoding"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/@leaflet/draw@1.0.4/dist/leaflet.draw.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@leaflet/draw@1.0.4/dist/leaflet.draw.js"></script>
 </head>
 <body>
 <div class="card" id="card">
@@ -566,78 +569,76 @@ function initializeMap() {
     if (!container || map) return;
 
     const postcode = currentEnquiry?.postcode || 'UK';
-    console.log('Initializing map for postcode:', postcode);
+    console.log('Initializing Leaflet map for postcode:', postcode);
 
-    // Check if Google Maps API is loaded
-    if (typeof google === 'undefined' || !google.maps) {
-      console.error('Google Maps API not loaded');
-      container.innerHTML = '<div style="padding:20px;text-align:center;color:#dc2626;"><strong>Google Maps failed to load</strong><br><small>Please refresh the page</small></div>';
-      return;
+    try {
+      // Initialize Leaflet map with OpenStreetMap
+      map = L.map(container).setView([54, -2], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(map);
+
+      // Geocode postcode to coordinates
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(postcode)}&addressdetails=1&limit=1`)
+        .then(r => r.json())
+        .then(results => {
+          if (results.length > 0) {
+            const loc = results[0];
+            const lat = parseFloat(loc.lat);
+            const lng = parseFloat(loc.lon);
+            console.log('Geocoded to:', lat, lng);
+            map.setView([lat, lng], 16);
+          } else {
+            console.warn('Postcode not found, staying at UK center');
+          }
+
+          // Add drawing tools
+          const drawnItems = new L.FeatureGroup();
+          map.addLayer(drawnItems);
+
+          const drawControl = new L.Control.Draw({
+            position: 'topleft',
+            draw: {
+              polygon: true,
+              polyline: false,
+              rectangle: false,
+              circle: false,
+              marker: false,
+              circlemarker: false
+            },
+            edit: {
+              featureGroup: drawnItems,
+              remove: true
+            }
+          });
+          map.addControl(drawControl);
+
+          map.on(L.Draw.Event.CREATED, (e) => {
+            const layer = e.layer;
+            drawnItems.addLayer(layer);
+
+            if (layer instanceof L.Polygon) {
+              const latlngs = layer.getLatLngs()[0];
+              polygonCoordinates = latlngs.map(point => ({
+                lat: point.lat,
+                lng: point.lng
+              }));
+              console.log('Polygon drawn with', polygonCoordinates.length, 'points');
+            }
+          });
+
+          console.log('Leaflet map initialized with drawing tools');
+        })
+        .catch(err => {
+          console.error('Geocoding error:', err);
+          console.log('Map ready with default view');
+        });
+
+    } catch (err) {
+      console.error('Leaflet initialization error:', err);
+      container.innerHTML += '<div style="padding:10px;margin-top:8px;font-size:12px;color:#dc2626;background:#fee2e2;border-radius:4px;">Error: ' + err.message + '</div>';
     }
-
-    console.log('Google Maps API loaded, geocoding:', postcode);
-    const geocoder = new google.maps.Geocoder();
-
-    geocoder.geocode({ address: postcode }, (results, status) => {
-      console.log('Geocode status:', status, 'Results:', results?.length);
-
-      if (status !== google.maps.GeocoderStatus.OK || !results.length) {
-        console.warn('Geocoding failed, using UK center');
-        results = [{ geometry: { location: new google.maps.LatLng(54, -2) } }];
-      }
-
-      const location = results[0].geometry.location;
-      console.log('Map center:', location.lat(), location.lng());
-
-      try {
-        map = new google.maps.Map(container, {
-          zoom: 16,
-          center: location,
-          mapTypeControl: false,
-          gestureHandling: 'greedy',
-        });
-        console.log('Map created successfully');
-
-        // Initialize Drawing Manager
-        if (!google.maps.drawing) {
-          console.error('Drawing library not loaded');
-          container.innerHTML += '<div style="padding:10px;margin-top:8px;font-size:12px;color:#dc2626;background:#fee2e2;border-radius:4px;">Drawing tools unavailable. Drawing library did not load.</div>';
-          return;
-        }
-
-        drawingManager = new google.maps.drawing.DrawingManager({
-          drawingMode: google.maps.drawing.OverlayType.POLYGON,
-          drawingControl: true,
-          drawingControlOptions: {
-            position: google.maps.ControlPosition.TOP_CENTER,
-            drawingModes: [google.maps.drawing.OverlayType.POLYGON],
-          },
-          polygonOptions: {
-            editable: true,
-            fillColor: '#1a3c2e',
-            fillOpacity: 0.2,
-            strokeColor: '#1a3c2e',
-            strokeWeight: 2,
-          },
-        });
-        drawingManager.setMap(map);
-        console.log('Drawing Manager initialized');
-
-        google.maps.event.addListener(drawingManager, 'polygoncomplete', (polygon) => {
-          console.log('Polygon drawn');
-          const path = polygon.getPath();
-          polygonCoordinates = path.getArray().map(point => ({
-            lat: point.lat(),
-            lng: point.lng(),
-          }));
-          console.log('Polygon coordinates saved:', polygonCoordinates.length, 'points');
-          drawingManager.setDrawingMode(null);
-        });
-      } catch (err) {
-        console.error('Map initialization error:', err);
-        container.innerHTML += '<div style="padding:10px;margin-top:8px;font-size:12px;color:#dc2626;background:#fee2e2;border-radius:4px;">Error: ' + err.message + '</div>';
-      }
-    });
 
     updateAcceptanceTime();
     setInterval(updateAcceptanceTime, 60000);
