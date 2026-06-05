@@ -448,6 +448,7 @@ async function submitStep2(enquiryId, ref) {
         report_addressee_name: finalReportName,
         report_addressee_address: finalReportAddress,
         report_title: document.getElementById('reportTitle').value.trim() || null,
+        survey_boundary_polygon: polygonCoordinates ? JSON.stringify(polygonCoordinates) : null,
       };
 
       console.log('Creating job with data:', jobData);
@@ -456,7 +457,6 @@ async function submitStep2(enquiryId, ref) {
         method: 'POST',
         headers: {
           'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
           'Content-Type': 'application/json',
           'Prefer': 'return=representation'
         },
@@ -468,15 +468,18 @@ async function submitStep2(enquiryId, ref) {
       console.log('Job response:', jobRespText);
 
       if (!jobResp.ok) {
-        console.error('Job creation failed:', jobRespText);
-        // Still show success to client, but log the error
+        console.error('❌ Job creation failed with status', jobResp.status);
+        console.error('Error details:', jobRespText);
       } else {
-        const createdJob = JSON.parse(jobRespText);
-        console.log('✅ Job created successfully:', createdJob[0]?.id);
+        try {
+          const createdJob = JSON.parse(jobRespText);
+          console.log('✅ Job created successfully:', createdJob[0]?.id);
+        } catch (e) {
+          console.log('✅ Job created (could not parse response)');
+        }
       }
     } catch (jobErr) {
       console.error('Error creating job:', jobErr.message);
-      // Don't block the success flow if job creation fails
     }
 
     showDone('🎉', 'All Done!',
