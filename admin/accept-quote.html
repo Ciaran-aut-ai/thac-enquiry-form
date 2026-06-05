@@ -574,37 +574,51 @@ function initializeMap() {
     if (!container || map) return;
 
     const postcode = currentEnquiry?.postcode || 'UK';
+    console.log('Initializing map for postcode:', postcode);
 
     // Check if Google Maps API is loaded
     if (typeof google === 'undefined' || !google.maps) {
-      container.innerHTML = '<div style="padding:20px;text-align:center;color:#999;font-size:13px;">Google Maps not loaded. Please refresh the page.</div>';
+      console.error('Google Maps API not loaded');
+      container.innerHTML = '<div style="padding:20px;text-align:center;color:#dc2626;"><strong>Google Maps failed to load</strong><br><small>Please refresh the page</small></div>';
       return;
     }
 
+    console.log('Google Maps API loaded, geocoding:', postcode);
     const geocoder = new google.maps.Geocoder();
 
     geocoder.geocode({ address: postcode }, (results, status) => {
+      console.log('Geocode status:', status, 'Results:', results?.length);
+
       if (status !== google.maps.GeocoderStatus.OK || !results.length) {
-        // Default to UK center if geocoding fails
+        console.warn('Geocoding failed, using UK center');
         results = [{ geometry: { location: new google.maps.LatLng(54, -2) } }];
       }
 
       const location = results[0].geometry.location;
-      map = new google.maps.Map(container, {
-        zoom: 16,
-        center: location,
-        mapTypeControl: false,
-        gestureHandling: 'greedy',
-      });
+      console.log('Map center:', location.lat(), location.lng());
 
-      // Initialize Drawing Manager
       try {
+        map = new google.maps.Map(container, {
+          zoom: 16,
+          center: location,
+          mapTypeControl: false,
+          gestureHandling: 'greedy',
+        });
+        console.log('Map created successfully');
+
+        // Initialize Drawing Manager
+        if (!google.maps.drawing) {
+          console.error('Drawing library not loaded');
+          container.innerHTML += '<div style="padding:10px;margin-top:8px;font-size:12px;color:#dc2626;background:#fee2e2;border-radius:4px;">Drawing tools unavailable. Drawing library did not load.</div>';
+          return;
+        }
+
         drawingManager = new google.maps.drawing.DrawingManager({
           drawingMode: google.maps.drawing.OverlayType.POLYGON,
           drawingControl: true,
           drawingControlOptions: {
             position: google.maps.ControlPosition.TOP_CENTER,
-            drawingModes: [google.maps.drawing.OverlayType.POLYGON, google.maps.drawing.OverlayType.POLYLINE],
+            drawingModes: [google.maps.drawing.OverlayType.POLYGON],
           },
           polygonOptions: {
             editable: true,
@@ -615,18 +629,21 @@ function initializeMap() {
           },
         });
         drawingManager.setMap(map);
+        console.log('Drawing Manager initialized');
 
         google.maps.event.addListener(drawingManager, 'polygoncomplete', (polygon) => {
+          console.log('Polygon drawn');
           const path = polygon.getPath();
           polygonCoordinates = path.getArray().map(point => ({
             lat: point.lat(),
             lng: point.lng(),
           }));
+          console.log('Polygon coordinates saved:', polygonCoordinates.length, 'points');
           drawingManager.setDrawingMode(null);
         });
       } catch (err) {
-        console.error('Drawing Manager error:', err);
-        container.innerHTML += '<div style="padding:10px;font-size:12px;color:#dc2626;background:#fee2e2;border-radius:4px;margin-top:8px;">Drawing tools unavailable. Check Google Cloud Console setup.</div>';
+        console.error('Map initialization error:', err);
+        container.innerHTML += '<div style="padding:10px;margin-top:8px;font-size:12px;color:#dc2626;background:#fee2e2;border-radius:4px;">Error: ' + err.message + '</div>';
       }
     });
 
