@@ -141,6 +141,7 @@ const action = params.get('action') || 'accept'; // 'accept' or 'decline'
 let map = null;
 let drawingManager = null;
 let polygonCoordinates = null;
+let loadedEnquiry = null;
 
 async function supabaseGet(table, query) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
@@ -203,6 +204,7 @@ async function init() {
 }
 
 function showAcceptConfirm(enq) {
+  loadedEnquiry = enq;
   const price = enq.quoted_price ? '£' + Number(enq.quoted_price).toLocaleString() + ' + VAT' : 'Custom quote';
   document.getElementById('card').innerHTML = `
     <div class="logo">🌳</div>
@@ -233,7 +235,7 @@ function showAcceptConfirm(enq) {
         <span class="detail-value" style="color:#1a3c2e;font-size:16px;">${price}</span>
       </div>
     </div>
-    <button class="btn btn-accept" onclick="acceptQuote('${enq.id}', '${enq.job_number || ''}', '${(enq.contact_name||'').replace(/'/g,"\\'")}', '${(enq.site_postcode||'').replace(/'/g,"\\'")}', ${JSON.stringify(enq).replace(/'/g, "&apos;")})">
+    <button class="btn btn-accept" onclick="acceptQuote('${enq.id}', '${enq.job_number || ''}')">
       ✅ Accept Quote
     </button>
     <button class="btn btn-decline" onclick="window.location.search='?id=${enq.id}&action=decline'">
@@ -277,10 +279,10 @@ function showDeclineConfirm(enq) {
   `;
 }
 
-async function acceptQuote(enquiryId, ref, contactName, postcode, enquiry) {
+async function acceptQuote(enquiryId, ref) {
   // Just show Step 2 - don't mark as accepted yet
   // Status will be updated when details are submitted
-  showStep2(enquiryId, ref, contactName, postcode, enquiry);
+  showStep2(enquiryId, ref, loadedEnquiry?.contact_name, loadedEnquiry?.site_postcode, loadedEnquiry);
 }
 
 const FIELD_STYLE = 'width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box;';
