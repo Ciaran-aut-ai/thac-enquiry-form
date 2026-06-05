@@ -645,11 +645,8 @@ function initializeMap() {
 
             if (layer instanceof L.Polygon) {
               const latlngs = layer.getLatLngs()[0];
-              polygonCoordinates = latlngs.map(point => ({
-                lat: point.lat,
-                lng: point.lng
-              }));
-              console.log('Polygon drawn with', polygonCoordinates.length, 'points');
+              polygonCoordinates = latlngs.map(point => [point.lat, point.lng]);
+              console.log('Polygon drawn with', polygonCoordinates.length, 'points:', polygonCoordinates);
             }
           });
 
