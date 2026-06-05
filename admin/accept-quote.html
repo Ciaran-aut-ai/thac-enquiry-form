@@ -432,8 +432,6 @@ async function submitStep2(enquiryId, ref) {
     // Auto-create job from accepted quote
     try {
       const jobData = {
-        enquiry_id: enquiryId,
-        job_number: ref,
         survey_type: currentEnquiry?.survey_type,
         site_postcode: currentEnquiry?.site_postcode,
         dispatch_state: 'pending_approval',
@@ -442,14 +440,7 @@ async function submitStep2(enquiryId, ref) {
                        currentEnquiry?.deadline_tier === '5days' ? 'yellow' : 'grey',
         quoted_amount: currentEnquiry?.quoted_price,
         agreed_amount: currentEnquiry?.quoted_price,
-        billing_contact_name: document.getElementById('billName').value.trim() || null,
-        billing_contact_email: document.getElementById('billEmail').value.trim() || null,
-        billing_address: billAddress,
-        report_addressee_name: finalReportName,
-        report_addressee_address: finalReportAddress,
-        report_title: document.getElementById('reportTitle').value.trim() || null,
         site_access_notes: document.getElementById('accessDetails').value.trim() || null,
-        created_at: new Date().toISOString(),
       };
 
       console.log('Creating job with data:', jobData);
