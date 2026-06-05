@@ -570,6 +570,8 @@ function initializeMap() {
 
     const postcode = currentEnquiry?.postcode || 'UK';
     console.log('Initializing Leaflet map for postcode:', postcode);
+    console.log('L available:', typeof L !== 'undefined');
+    console.log('L.Control.Draw available:', typeof L !== 'undefined' && typeof L.Control.Draw !== 'undefined');
 
     try {
       // Initialize Leaflet map with OpenStreetMap
@@ -578,6 +580,7 @@ function initializeMap() {
         attribution: '© OpenStreetMap contributors',
         maxZoom: 19
       }).addTo(map);
+      console.log('Leaflet map created');
 
       // Geocode postcode to coordinates
       fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(postcode)}&addressdetails=1&limit=1`)
@@ -594,8 +597,15 @@ function initializeMap() {
           }
 
           // Add drawing tools
+          if (typeof L.Control.Draw === 'undefined') {
+            console.error('Leaflet-Draw not loaded');
+            container.innerHTML += '<div style="padding:10px;margin-top:8px;font-size:12px;color:#dc2626;background:#fee2e2;border-radius:4px;">Drawing tools not available. Please refresh the page.</div>';
+            return;
+          }
+
           const drawnItems = new L.FeatureGroup();
           map.addLayer(drawnItems);
+          console.log('Drawing feature group added');
 
           const drawControl = new L.Control.Draw({
             position: 'topleft',
@@ -613,8 +623,10 @@ function initializeMap() {
             }
           });
           map.addControl(drawControl);
+          console.log('Draw control added to map');
 
           map.on(L.Draw.Event.CREATED, (e) => {
+            console.log('Draw event triggered');
             const layer = e.layer;
             drawnItems.addLayer(layer);
 
@@ -628,7 +640,7 @@ function initializeMap() {
             }
           });
 
-          console.log('Leaflet map initialized with drawing tools');
+          console.log('✅ Leaflet map ready with drawing tools');
         })
         .catch(err => {
           console.error('Geocoding error:', err);
