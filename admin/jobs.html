@@ -72,7 +72,7 @@ async function init() {
 async function loadJobs() {
   try {
     const data = await dbGet('jobs', {
-      'select': 'id,reference,job_type,survey_type,urgency_state,dispatch_state,site_postcode,survey_date,agreed_amount,billing_mode,is_archived,created_at',
+      'select': 'id,reference,job_type,survey_type,urgency_state,dispatch_state,site_postcode,survey_date,agreed_amount,billing_mode,is_archived,created_at,billing_contact_name',
       'order': 'created_at.desc',
       'limit': 100
     });
@@ -151,6 +151,8 @@ function renderTable() {
     return `
     <tr onclick="window.location.href='job-detail.html?id=${j.id}'" style="cursor:pointer">
       <td><div class="ref">${j.reference || j.id.slice(0,8).toUpperCase()}</div></td>
+      <td>${j.billing_contact_name || '<span class="muted">—</span>'}</td>
+      <td>${j.created_at ? formatDate(j.created_at) : '<span class="muted">—</span>'}</td>
       <td>${getSurveyLabel(j.survey_type || j.job_type)}</td>
       <td>${j.site_postcode || '—'}</td>
       <td>${j.survey_date ? formatDate(j.survey_date) : '<span class="muted">TBC</span>'}</td>
@@ -165,6 +167,8 @@ function renderTable() {
       <thead>
         <tr>
           <th>Reference</th>
+          <th>Name</th>
+          <th>Date Created</th>
           <th>Survey Type</th>
           <th>Postcode</th>
           <th>Survey Date</th>
