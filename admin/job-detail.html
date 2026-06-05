@@ -330,11 +330,25 @@ function renderInvoiceActions() {
 }
 
 function renderAcceptanceDetails() {
-  if (!enquiry || (!enquiry.billing_contact_name && !enquiry.access_details && !enquiry.parking_details)) {
+  // Check both enquiry data AND job data for client details
+  const hasEnquiryDetails = enquiry && (enquiry.billing_contact_name || enquiry.access_details || enquiry.parking_details);
+  const hasJobDetails = job && (job.billing_contact_name || job.site_access_notes);
+
+  if (!hasEnquiryDetails && !hasJobDetails) {
     return '';
   }
 
-  const hasDetails = enquiry.billing_contact_name || enquiry.end_client_name || enquiry.access_details || enquiry.parking_details || enquiry.site_boundary_polygon;
+  // Use enquiry data if available, otherwise use job data
+  const billingName = enquiry?.billing_contact_name || job?.billing_contact_name;
+  const billingEmail = enquiry?.billing_contact_email || job?.billing_contact_email;
+  const billingAddress = enquiry?.billing_address || job?.billing_address;
+  const accessDetails = enquiry?.access_details || job?.site_access_notes;
+  const parkingDetails = enquiry?.parking_details;
+  const reportTitle = enquiry?.report_title || job?.report_title;
+  const reportAddresseeName = enquiry?.report_addressee_name || job?.report_addressee_name;
+  const endClientName = enquiry?.end_client_name;
+
+  const hasDetails = billingName || endClientName || accessDetails || parkingDetails;
   if (!hasDetails) return '';
 
   return `
@@ -344,48 +358,38 @@ function renderAcceptanceDetails() {
       </div>
       <div id="acceptanceContent" style="display:none;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
-          ${enquiry.billing_contact_name ? `
+          ${billingName ? `
             <div>
               <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Invoice Contact</div>
-              <div style="font-size:13px;font-weight:600;color:var(--text);">${enquiry.billing_contact_name}</div>
-              ${enquiry.billing_contact_email ? `<div style="font-size:12px;color:var(--text-muted);">${enquiry.billing_contact_email}</div>` : ''}
-              ${enquiry.billing_address ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px;white-space:pre-wrap;">${enquiry.billing_address}</div>` : ''}
+              <div style="font-size:13px;font-weight:600;color:var(--text);">${billingName}</div>
+              ${billingEmail ? `<div style="font-size:12px;color:var(--text-muted);">${billingEmail}</div>` : ''}
+              ${billingAddress ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px;white-space:pre-wrap;">${billingAddress}</div>` : ''}
             </div>
           ` : ''}
-          ${enquiry.end_client_name && enquiry.end_client_name !== enquiry.billing_contact_name ? `
+          ${endClientName && endClientName !== billingName ? `
             <div>
               <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">End Client</div>
-              <div style="font-size:13px;font-weight:600;color:var(--text);">${enquiry.end_client_name}</div>
-              ${enquiry.end_client_email ? `<div style="font-size:12px;color:var(--text-muted);">${enquiry.end_client_email}</div>` : ''}
+              <div style="font-size:13px;font-weight:600;color:var(--text);">${endClientName}</div>
             </div>
           ` : ''}
-          ${enquiry.report_addressee_name ? `
+          ${reportAddresseeName ? `
             <div>
               <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Report Addressee</div>
-              <div style="font-size:13px;font-weight:600;color:var(--text);">${enquiry.report_addressee_name}</div>
-              ${enquiry.report_title ? `<div style="font-size:12px;color:var(--text-muted);">${enquiry.report_title}</div>` : ''}
-              ${enquiry.report_addressee_address ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px;white-space:pre-wrap;">${enquiry.report_addressee_address}</div>` : ''}
+              <div style="font-size:13px;font-weight:600;color:var(--text);">${reportAddresseeName}</div>
+              ${reportTitle ? `<div style="font-size:12px;color:var(--text-muted);">${reportTitle}</div>` : ''}
             </div>
           ` : ''}
         </div>
-        ${enquiry.access_details ? `
+        ${accessDetails ? `
           <div style="margin-bottom:12px;">
             <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Access Details</div>
-            <div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${enquiry.access_details}</div>
+            <div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${accessDetails}</div>
           </div>
         ` : ''}
-        ${enquiry.parking_details ? `
+        ${parkingDetails ? `
           <div style="margin-bottom:12px;">
             <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Parking Details</div>
-            <div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${enquiry.parking_details}</div>
-          </div>
-        ` : ''}
-        ${enquiry.site_boundary_polygon ? `
-          <div>
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Site Boundary</div>
-            <div style="font-size:12px;color:var(--text-muted);padding:10px;background:var(--bg);border-radius:8px;">
-              Polygon with ${JSON.parse(enquiry.site_boundary_polygon).length} points defined
-            </div>
+            <div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${parkingDetails}</div>
           </div>
         ` : ''}
       </div>
