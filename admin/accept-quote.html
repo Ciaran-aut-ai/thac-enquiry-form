@@ -453,6 +453,7 @@ async function submitStep2(enquiryId, ref) {
         site_boundary_polygon: polygonCoordinates ? JSON.stringify(polygonCoordinates) : null,
       };
 
+      console.log('polygonCoordinates before job creation:', polygonCoordinates);
       console.log('Creating job with data:', jobData);
 
       const jobResp = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
