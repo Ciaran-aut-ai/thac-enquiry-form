@@ -159,8 +159,7 @@ async function loadJob() {
   try {
     const data = await dbGet('jobs', {
       'id': `eq.${jobId}`,
-      'limit': 1,
-      'select': '*,site_boundary_polygon'
+      'limit': 1
     });
     if (!data || data.length === 0) {
       document.getElementById('pageBody').innerHTML = `<div class="empty-state"><h3>Job not found</h3></div>`;
@@ -339,8 +338,9 @@ function renderAcceptanceDetails() {
   // Check both enquiry data AND job data for client details
   const hasEnquiryDetails = enquiry && (enquiry.billing_contact_name || enquiry.access_details || enquiry.parking_details);
   const hasJobDetails = job && (job.billing_contact_name || job.site_access_notes);
+  const hasBoundary = enquiry?.site_boundary_polygon || job?.site_boundary_polygon;
 
-  if (!hasEnquiryDetails && !hasJobDetails) {
+  if (!hasEnquiryDetails && !hasJobDetails && !hasBoundary) {
     return '';
   }
 
