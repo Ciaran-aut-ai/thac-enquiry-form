@@ -410,24 +410,22 @@ function renderAcceptanceDetails() {
   `;
 
   // Display boundary map if polygon exists
-  console.log('About to check for boundary map');
-  const container = document.getElementById('boundaryMapContainer');
-  console.log('Container:', container);
-
-  if (container) {
-    const polyData = enquiry?.site_boundary_polygon || job?.site_boundary_polygon;
-    console.log('Polygon data:', polyData);
-
-    if (polyData) {
-      console.log('✅ Calling displayBoundaryMap');
-      setTimeout(() => displayBoundaryMap(), 100);
-    } else {
-      console.log('❌ No polygon data');
-      container.innerHTML = '<div style="padding:10px;font-size:12px;color:#999;">No polygon data available</div>';
+  setTimeout(() => {
+    const container = document.getElementById('boundaryMapContainer');
+    if (!container) {
+      console.log('❌ Container not found');
+      return;
     }
-  } else {
-    console.log('❌ Container element not found');
-  }
+
+    const polyData = enquiry?.site_boundary_polygon || job?.site_boundary_polygon;
+    if (!polyData) {
+      container.innerHTML = '<div style="padding:10px;font-size:12px;color:#999;">No polygon</div>';
+      return;
+    }
+
+    console.log('✅ Calling displayBoundaryMap with:', polyData);
+    displayBoundaryMap();
+  }, 200);
 }
 
 function toggleAcceptanceDetails() {
