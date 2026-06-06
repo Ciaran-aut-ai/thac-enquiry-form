@@ -459,51 +459,39 @@ function displayBoundaryMap() {
 
   if (!coordinates || !Array.isArray(coordinates) || coordinates.length < 2) return;
 
-  // Create SVG map of polygon
-  const width = 600;
-  const height = 280;
-  const padding = 20;
-
-  // Find bounds
+  const width = 600, height = 280, pad = 20;
   const lats = coordinates.map(c => c[0]);
   const lngs = coordinates.map(c => c[1]);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
   const latRange = maxLat - minLat || 0.001;
   const lngRange = maxLng - minLng || 0.001;
 
-  // Convert lat/lng to SVG coordinates
   const toSVG = (lat, lng) => {
-    const x = padding + ((lng - minLng) / lngRange) * (width - 2 * padding);
-    const y = height - padding - ((lat - minLat) / latRange) * (height - 2 * padding);
+    const x = pad + ((lng - minLng) / lngRange) * (width - 2 * pad);
+    const y = height - pad - ((lat - minLat) / latRange) * (height - 2 * pad);
     return [x, y];
   };
 
-  // Build SVG
-  const points = coordinates.map(c => toSVG(c[0], c[1])).map(p => p.join(',')).join(' ');
-  const svg = `
-    <svg width="${width}" height="${height}" style="border:1px solid #ddd;border-radius:4px;background:#f5f5f5;">
-      <!-- Grid background -->
-      <defs>
-        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#eee" stroke-width="0.5"/>
-        </pattern>
-      </defs>
-      <rect width="${width}" height="${height}" fill="url(#grid)" />
+  let svg = '<svg width="' + width + '" height="' + height + '" style="border:1px solid #ddd;border-radius:4px;background:#f5f5f5;">';
+  svg += '<rect width="' + width + '" height="' + height + '" fill="#fafafa"/>';
 
-      <!-- Polygon -->
-      <polygon points="${points}" fill="#c8e6d4" fill-opacity="0.4" stroke="#1a3c2e" stroke-width="2" />
+  // Draw polygon
+  let polyPoints = '';
+  for (let i = 0; i < coordinates.length; i++) {
+    const [x, y] = toSVG(coordinates[i][0], coordinates[i][1]);
+    polyPoints += x + ',' + y + ' ';
+  }
+  svg += '<polygon points="' + polyPoints + '" fill="#c8e6d4" fill-opacity="0.4" stroke="#1a3c2e" stroke-width="2" />';
 
-      <!-- Points -->
-      ${coordinates.map((c, i) => {
-        const [x, y] = toSVG(c[0], c[1]);
-        return `<circle cx="${x}" cy="${y}" r="4" fill="#1a3c2e" /><text x="${x+8}" y="${y+4}" font-size="10" fill="#1a3c2e">${i+1}</text>`;
-      }).join('')}
-    </svg>
-  `;
+  // Draw points
+  for (let i = 0; i < coordinates.length; i++) {
+    const [x, y] = toSVG(coordinates[i][0], coordinates[i][1]);
+    svg += '<circle cx="' + x + '" cy="' + y + '" r="4" fill="#1a3c2e" />';
+    svg += '<text x="' + (x + 8) + '" y="' + (y + 4) + '" font-size="10" fill="#1a3c2e">' + (i + 1) + '</text>';
+  }
 
+  svg += '</svg>';
   container.innerHTML = svg;
 }
 
