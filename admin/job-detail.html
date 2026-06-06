@@ -462,9 +462,9 @@ function displayBoundaryMap() {
   try {
     // Clear container and initialize map
     container.innerHTML = '';
-    const map = L.map(container).setView([coordinates[0][0], coordinates[0][1]], 15);
+    const map = L.map(container, { dragging: true, scrollWheelZoom: false });
 
-    // Use CartoDB tiles (more reliable than OpenStreetMap)
+    // Use CartoDB tiles
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '© CartoDB',
       maxZoom: 19,
@@ -480,8 +480,14 @@ function displayBoundaryMap() {
       fillOpacity: 0.3
     }).addTo(map);
 
-    // Fit to polygon bounds
-    map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+    // Fit to polygon bounds with padding
+    const bounds = polygon.getBounds();
+    map.fitBounds(bounds, { padding: [40, 40] });
+
+    // Lock map to polygon - prevent panning outside bounds
+    const maxBounds = bounds.pad(0.2); // 20% margin
+    map.setMaxBounds(maxBounds);
+    map.on('drag', () => map.panInsideBounds(maxBounds, { animate: false }));
 
     // Force redraw
     setTimeout(() => map.invalidateSize(), 100);
