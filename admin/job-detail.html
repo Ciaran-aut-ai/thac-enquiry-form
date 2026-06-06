@@ -472,9 +472,10 @@ function displayBoundaryMap() {
       attribution: false
     });
 
-    // OpenStreetMap tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // CartoDB tiles (more reliable)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
+      subdomains: 'abcd',
       attribution: false
     }).addTo(map);
 
