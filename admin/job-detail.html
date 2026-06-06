@@ -409,8 +409,14 @@ function renderAcceptanceDetails() {
   `;
 
   // Display boundary map if polygon exists
+  console.log('Checking for boundary polygon...');
+  console.log('enquiry:', enquiry);
+  console.log('job:', job);
   if ((enquiry?.site_boundary_polygon || job?.site_boundary_polygon)) {
+    console.log('Boundary polygon found, calling displayBoundaryMap');
     setTimeout(() => displayBoundaryMap(), 100);
+  } else {
+    console.log('No boundary polygon found');
   }
 }
 
@@ -431,10 +437,16 @@ function toggleAcceptanceDetails() {
 }
 
 function displayBoundaryMap() {
+  console.log('displayBoundaryMap called');
+  console.log('job?.site_boundary_polygon:', job?.site_boundary_polygon);
+  console.log('enquiry?.site_boundary_polygon:', enquiry?.site_boundary_polygon);
+
   const container = document.getElementById('boundaryMapContainer');
+  console.log('Container found:', !!container);
   if (!container) return;
 
   const polygonData = enquiry?.site_boundary_polygon || job?.site_boundary_polygon;
+  console.log('Polygon data:', polygonData);
   if (!polygonData) return;
 
   let coordinates = polygonData;
