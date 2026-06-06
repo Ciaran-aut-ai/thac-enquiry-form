@@ -410,12 +410,22 @@ function renderAcceptanceDetails() {
   `;
 
   // Display boundary map if polygon exists
-  if ((enquiry?.site_boundary_polygon || job?.site_boundary_polygon)) {
-    document.body.innerHTML += '<div style="position:fixed;top:60px;left:20px;background:blue;color:white;padding:10px;border-radius:4px;z-index:9999;">Map function called</div>';
-    setTimeout(() => displayBoundaryMap(), 200);
-  } else {
-    document.body.innerHTML += '<div style="position:fixed;top:100px;left:20px;background:orange;color:white;padding:10px;border-radius:4px;z-index:9999;">No polygon data</div>';
-  }
+  setTimeout(() => {
+    const container = document.getElementById('boundaryMapContainer');
+    if (!container) {
+      console.log('❌ Boundary container not found');
+      return;
+    }
+
+    const polyData = enquiry?.site_boundary_polygon || job?.site_boundary_polygon;
+    if (!polyData) {
+      container.innerHTML = 'No polygon data';
+      return;
+    }
+
+    console.log('✅ Displaying boundary map');
+    displayBoundaryMap();
+  }, 300);
 }
 
 function toggleAcceptanceDetails() {
@@ -485,11 +495,6 @@ function displayBoundaryMap() {
 }
 
 function renderJob() {
-  const debugBox = document.createElement('div');
-  debugBox.style.cssText = 'position:fixed;top:20px;left:20px;background:green;color:white;padding:10px;border-radius:4px;z-index:9999;';
-  debugBox.textContent = 'renderJob called';
-  document.body.appendChild(debugBox);
-
   document.getElementById('pageBody').innerHTML = `
     <div class="detail-header">
       <div>
