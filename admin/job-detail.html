@@ -486,7 +486,13 @@ function renderContactDetails() {
   const email = enquiry?.contact_email || job?.billing_contact_email;
   const phone = enquiry?.contact_phone;
 
-  if (!name && !email && !phone) return '';
+  const invoiceName = job?.billing_contact_name;
+  const invoiceEmail = job?.billing_contact_email;
+  const invoiceAddress = job?.billing_address;
+
+  const reportAddresseeName = job?.report_addressee_name;
+
+  if (!name && !email && !phone && !invoiceName && !invoiceEmail && !invoiceAddress && !reportAddresseeName) return '';
 
   return `
     <div class="card">
@@ -517,6 +523,39 @@ function renderContactDetails() {
           </div>
         ` : ''}
       </div>
+
+      ${invoiceName || invoiceEmail || invoiceAddress ? `
+        <div style="grid-column:1/-1;margin-top:8px;padding-top:12px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;">Invoice Person</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            ${invoiceName ? `
+              <div>
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Name</div>
+                <div style="font-size:13px;color:var(--text);">${invoiceName}</div>
+              </div>
+            ` : ''}
+            ${invoiceEmail ? `
+              <div>
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Email</div>
+                <div style="font-size:13px;"><a href="mailto:${invoiceEmail}">${invoiceEmail}</a></div>
+              </div>
+            ` : ''}
+            ${invoiceAddress ? `
+              <div style="grid-column:1/-1;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Address</div>
+                <div style="font-size:13px;color:var(--text);white-space:pre-wrap;">${invoiceAddress}</div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      ` : ''}
+
+      ${reportAddresseeName ? `
+        <div style="grid-column:1/-1;margin-top:8px;padding-top:12px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Report Addressee</div>
+          <div style="font-size:13px;color:var(--text);">${reportAddresseeName}</div>
+        </div>
+      ` : ''}
     </div>
   `;
 }
