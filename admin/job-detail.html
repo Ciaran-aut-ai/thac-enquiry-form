@@ -605,12 +605,12 @@ function renderSurveyAndSiteDetails() {
               <button class="btn btn-secondary btn-sm" id="editParkingBtn" onclick="toggleParkingEditor()">Edit</button>
             </div>
             <div id="parkingDisplay">
-              ${enquiry?.parking_details || job?.parking_details ? `<div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${enquiry?.parking_details || job?.parking_details}</div>` : ''}
+              ${job?.parking_details || enquiry?.parking_details ? `<div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${job?.parking_details || enquiry?.parking_details}</div>` : ''}
             </div>
             <div id="parkingEditor" style="display:none;margin-top:8px;">
               <div class="form-group">
                 <label>Parking Details</label>
-                <textarea class="form-control" id="parkingText" rows="3" placeholder="Parking information...">${enquiry?.parking_details || job?.parking_details || ''}</textarea>
+                <textarea class="form-control" id="parkingText" rows="3" placeholder="Parking information...">${job?.parking_details || enquiry?.parking_details || ''}</textarea>
               </div>
               <div style="display:flex;gap:8px;">
                 <button class="btn btn-secondary btn-sm" onclick="toggleParkingEditor()">Cancel</button>
