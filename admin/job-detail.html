@@ -337,7 +337,7 @@ function renderInvoiceActions() {
 
 function renderAcceptanceDetails() {
   // Check both enquiry data AND job data for client details
-  const hasEnquiryDetails = enquiry && (enquiry.billing_contact_name || enquiry.access_details || enquiry.parking_details);
+  const hasEnquiryDetails = enquiry && (enquiry.billing_contact_name || enquiry.access_details);
   const hasJobDetails = job && (job.billing_contact_name || job.site_access_notes);
   const hasBoundary = enquiry?.site_boundary_polygon || job?.site_boundary_polygon;
 
@@ -350,12 +350,11 @@ function renderAcceptanceDetails() {
   const billingEmail = enquiry?.billing_contact_email || job?.billing_contact_email;
   const billingAddress = enquiry?.billing_address || job?.billing_address;
   const accessDetails = enquiry?.access_details || job?.site_access_notes;
-  const parkingDetails = enquiry?.parking_details;
   const reportTitle = enquiry?.report_title || job?.report_title;
   const reportAddresseeName = enquiry?.report_addressee_name || job?.report_addressee_name;
   const endClientName = enquiry?.end_client_name;
 
-  const hasDetails = billingName || endClientName || accessDetails || parkingDetails;
+  const hasDetails = billingName || endClientName || accessDetails;
   if (!hasDetails) return '';
 
   return `
@@ -391,12 +390,6 @@ function renderAcceptanceDetails() {
           <div style="margin-bottom:12px;">
             <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Access Details</div>
             <div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${accessDetails}</div>
-          </div>
-        ` : ''}
-        ${parkingDetails ? `
-          <div style="margin-bottom:12px;">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Parking Details</div>
-            <div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${parkingDetails}</div>
           </div>
         ` : ''}
       </div>
@@ -608,6 +601,12 @@ function renderSurveyAndSiteDetails() {
           <div class="detail-field">
             <label>SLA Deadline</label>
             <div class="field-value">${formatDate(slaDeadline)}</div>
+          </div>
+        ` : ''}
+        ${enquiry?.parking_details ? `
+          <div style="grid-column:1/-1;margin-top:8px;padding-top:12px;border-top:1px solid var(--border);">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Parking Details</div>
+            <div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${enquiry.parking_details}</div>
           </div>
         ` : ''}
         <div style="grid-column:1/-1;margin-top:8px;padding-top:12px;border-top:1px solid var(--border);">
