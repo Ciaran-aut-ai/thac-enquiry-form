@@ -519,14 +519,8 @@ function renderSurveyAndSiteDetails() {
             <div class="field-value">${deadlineTier}</div>
           </div>
         ` : ''}
-        ${address ? `
-          <div class="detail-field" style="grid-column:1/-1">
-            <label>Site Address</label>
-            <div class="field-value">${address}<br><a href="https://maps.google.com/?q=${postcode}" target="_blank" style="font-size:12px;color:var(--green-mid);">View on Google Maps →</a></div>
-          </div>
-        ` : ''}
         ${coordinates ? `
-          <div class="detail-field" style="grid-column:1/-1">
+          <div class="detail-field">
             <label>Coordinates</label>
             <div class="field-value" style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
               <span>📍 ${coordinates}</span>
@@ -534,8 +528,14 @@ function renderSurveyAndSiteDetails() {
             </div>
           </div>
         ` : job?.site_postcode && !coordinates ? `
-          <div class="detail-field" style="grid-column:1/-1">
+          <div class="detail-field">
             <button class="btn btn-secondary btn-sm" onclick="geocodePostcode()">📍 Get Coordinates</button>
+          </div>
+        ` : ''}
+        ${address ? `
+          <div class="detail-field" style="grid-column:1/-1">
+            <label>Site Address</label>
+            <div class="field-value">${address}<br><a href="https://maps.google.com/?q=${postcode}" target="_blank" style="font-size:12px;color:var(--green-mid);">View on Google Maps →</a></div>
           </div>
         ` : ''}
         ${surveyDate ? `
