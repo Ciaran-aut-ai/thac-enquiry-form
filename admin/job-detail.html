@@ -335,84 +335,6 @@ function renderInvoiceActions() {
   return buttons.join('');
 }
 
-function renderAcceptanceDetails() {
-  // Check both enquiry data AND job data for client details
-  const hasEnquiryDetails = enquiry && (enquiry.billing_contact_name || enquiry.access_details);
-  const hasJobDetails = job && (job.billing_contact_name || job.site_access_notes);
-  const hasBoundary = enquiry?.site_boundary_polygon || job?.site_boundary_polygon;
-
-  if (!hasEnquiryDetails && !hasJobDetails && !hasBoundary) {
-    return '';
-  }
-
-  // Use enquiry data if available, otherwise use job data
-  const billingName = enquiry?.billing_contact_name || job?.billing_contact_name;
-  const billingEmail = enquiry?.billing_contact_email || job?.billing_contact_email;
-  const billingAddress = enquiry?.billing_address || job?.billing_address;
-  const accessDetails = enquiry?.access_details || job?.site_access_notes;
-  const reportTitle = enquiry?.report_title || job?.report_title;
-  const reportAddresseeName = enquiry?.report_addressee_name || job?.report_addressee_name;
-  const endClientName = enquiry?.end_client_name;
-
-  const hasDetails = billingName || endClientName || accessDetails;
-  if (!hasDetails) return '';
-
-  return `
-    <div class="card">
-      <div class="card-title" style="cursor:pointer;" onclick="toggleAcceptanceDetails()">
-        <span id="acceptanceToggle">▼</span> Client & Site Details
-      </div>
-      <div id="acceptanceContent" style="display:none;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
-          ${billingName ? `
-            <div>
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Invoice Contact</div>
-              <div style="font-size:13px;font-weight:600;color:var(--text);">${billingName}</div>
-              ${billingEmail ? `<div style="font-size:12px;color:var(--text-muted);">${billingEmail}</div>` : ''}
-              ${billingAddress ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px;white-space:pre-wrap;">${billingAddress}</div>` : ''}
-            </div>
-          ` : ''}
-          ${endClientName && endClientName !== billingName ? `
-            <div>
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">End Client</div>
-              <div style="font-size:13px;font-weight:600;color:var(--text);">${endClientName}</div>
-            </div>
-          ` : ''}
-          ${reportAddresseeName ? `
-            <div>
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Report Addressee</div>
-              <div style="font-size:13px;font-weight:600;color:var(--text);">${reportAddresseeName}</div>
-              ${reportTitle ? `<div style="font-size:12px;color:var(--text-muted);">${reportTitle}</div>` : ''}
-            </div>
-          ` : ''}
-        </div>
-        ${accessDetails ? `
-          <div style="margin-bottom:12px;">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Access Details</div>
-            <div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${accessDetails}</div>
-          </div>
-        ` : ''}
-      </div>
-    </div>
-  `;
-}
-
-function toggleAcceptanceDetails() {
-  const content = document.getElementById('acceptanceContent');
-  const toggle = document.getElementById('acceptanceToggle');
-  if (content.style.display === 'none') {
-    content.style.display = 'block';
-    toggle.textContent = '▼';
-    // Redraw map if it exists and wasn't visible
-    setTimeout(() => {
-      if (window.boundaryMap) window.boundaryMap.invalidateSize();
-    }, 100);
-  } else {
-    content.style.display = 'none';
-    toggle.textContent = '▶';
-  }
-}
-
 function displayBoundaryMap() {
   setTimeout(() => {
     const container = document.getElementById('boundaryMapContainer');
@@ -782,9 +704,6 @@ function renderJob() {
           </div>
           ${renderInvoiceSection()}
         </div>
-
-<!-- Client & Site Details (Acceptance) -->
-        ${renderAcceptanceDetails()}
 
         <!-- Billing & Report Details -->
         <div class="card">
