@@ -537,12 +537,7 @@ function renderSurveyAndSiteDetails() {
 
   return `
     <div class="card">
-      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-        <div>Survey & Site Details</div>
-        <button class="btn btn-secondary btn-sm" id="editAccessBtn" onclick="toggleAccessEditor()">
-          ${hasAccessDetails ? 'Edit' : 'Add access details'}
-        </button>
-      </div>
+      <div class="card-title">Survey & Site Details</div>
       <div class="detail-grid">
         ${surveyType ? `
           <div class="detail-field">
@@ -603,14 +598,34 @@ function renderSurveyAndSiteDetails() {
             <div class="field-value">${formatDate(slaDeadline)}</div>
           </div>
         ` : ''}
-        ${enquiry?.parking_details ? `
+        ${enquiry?.parking_details || job?.parking_details ? `
           <div style="grid-column:1/-1;margin-top:8px;padding-top:12px;border-top:1px solid var(--border);">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Parking Details</div>
-            <div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${enquiry.parking_details}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Parking Details</div>
+              <button class="btn btn-secondary btn-sm" id="editParkingBtn" onclick="toggleParkingEditor()">Edit</button>
+            </div>
+            <div id="parkingDisplay">
+              ${enquiry?.parking_details || job?.parking_details ? `<div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${enquiry?.parking_details || job?.parking_details}</div>` : ''}
+            </div>
+            <div id="parkingEditor" style="display:none;margin-top:8px;">
+              <div class="form-group">
+                <label>Parking Details</label>
+                <textarea class="form-control" id="parkingText" rows="3" placeholder="Parking information...">${enquiry?.parking_details || job?.parking_details || ''}</textarea>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-secondary btn-sm" onclick="toggleParkingEditor()">Cancel</button>
+                <button class="btn btn-primary btn-sm" onclick="saveParkingDetails()">Save</button>
+              </div>
+            </div>
           </div>
         ` : ''}
         <div style="grid-column:1/-1;margin-top:8px;padding-top:12px;border-top:1px solid var(--border);">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Site Access</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Site Access</div>
+            <button class="btn btn-secondary btn-sm" id="editAccessBtn" onclick="toggleAccessEditor()">
+              ${job?.site_access_notes ? 'Edit' : 'Add access details'}
+            </button>
+          </div>
           <div id="accessDisplay">
             ${job?.site_access_notes ? `
               <div style="font-size:13px;line-height:1.6;background:var(--bg);padding:12px;border-radius:8px;white-space:pre-wrap;">${job.site_access_notes}</div>` : ''}
@@ -1556,6 +1571,28 @@ async function saveAccessNotes() {
     job.site_access_notes = text || null;
     job.site_location_tag = tag  || null;
     showToast('Site access details saved');
+    renderJob();
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+function toggleParkingEditor() {
+  const display = document.getElementById('parkingDisplay');
+  const editor  = document.getElementById('parkingEditor');
+  const btn     = document.getElementById('editParkingBtn');
+  const isEditing = editor.style.display !== 'none';
+  display.style.display = isEditing ? '' : 'none';
+  editor.style.display  = isEditing ? 'none' : '';
+  btn.textContent = isEditing ? 'Edit' : 'Cancel';
+}
+
+async function saveParkingDetails() {
+  const text = document.getElementById('parkingText').value.trim();
+  try {
+    await dbUpdate('jobs', `id=eq.${jobId}`, {
+      parking_details: text || null,
+    });
+    job.parking_details = text || null;
+    showToast('Parking details saved');
     renderJob();
   } catch (e) { showToast('Error: ' + e.message, 'error'); }
 }
