@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Confirm Your Quote Details — THAC</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBrqOa3_hCN9n_6_Nfws7MSP5F9b9mhPJc"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 <style>
   :root {
     --green-dark: #1a3a2a;
@@ -504,118 +507,61 @@ function initMap() {
   if (!mapContainer) return;
 
   // Use the site coordinates from the enquiry if available
-  let centerLat = 54, centerLng = -2, zoom = 6;
+  let initialLat = 54, initialLng = -2, initialZoom = 6;
   if (enquiry && enquiry.site_lat && enquiry.site_lng) {
-    centerLat = enquiry.site_lat;
-    centerLng = enquiry.site_lng;
-    zoom = 17;
+    initialLat = enquiry.site_lat;
+    initialLng = enquiry.site_lng;
+    initialZoom = 17;
   }
 
-  // Initialize Google Map
-  map = new google.maps.Map(mapContainer, {
-    center: { lat: centerLat, lng: centerLng },
-    zoom: zoom,
-    mapTypeId: 'satellite',
-    fullscreenControl: false,
-    streetViewControl: false
-  });
+  // Initialize Leaflet map
+  map = L.map(mapContainer).setView([initialLat, initialLng], initialZoom);
 
-  // Add marker at site location
+  // Add Esri World Imagery (satellite)
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Esri',
+    maxZoom: 18
+  }).addTo(map);
+
+  // Add marker at site location if available
   if (enquiry && enquiry.site_lat && enquiry.site_lng) {
-    new google.maps.Marker({
-      position: { lat: enquiry.site_lat, lng: enquiry.site_lng },
-      map: map,
-      title: enquiry.site_postcode || 'Survey Site',
-      icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
-    });
+    L.marker([enquiry.site_lat, enquiry.site_lng], {
+      title: enquiry.site_postcode || 'Survey Site'
+    }).addTo(map);
   }
 
-  // Custom polygon drawing
-  let isDrawing = false;
-  let polygonPath = [];
-  let markerPath = [];
-  let currentPolyline = null;
+  // Add drawing tools
+  const drawnItems = new L.FeatureGroup();
+  map.addLayer(drawnItems);
 
-  const drawBtn = document.getElementById('drawBtn');
-  const clearBtn = document.getElementById('clearBtn');
-  const doneBtn = document.getElementById('doneBtn');
-
-  if (drawBtn) {
-    drawBtn.addEventListener('click', () => {
-      isDrawing = !isDrawing;
-      drawBtn.classList.toggle('active', isDrawing);
-      if (!isDrawing) clearDrawing();
-    });
-  }
-
-  if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-      polygonPath = [];
-      markerPath.forEach(m => m.setMap(null));
-      markerPath = [];
-      if (currentPolyline) currentPolyline.setMap(null);
-      currentPolyline = null;
-      polygonCoordinates = [];
-      isDrawing = false;
-      if (drawBtn) drawBtn.classList.remove('active');
-    });
-  }
-
-  if (doneBtn) {
-    doneBtn.addEventListener('click', () => {
-      if (polygonPath.length >= 3) {
-        // Create filled polygon
-        polygon = new google.maps.Polygon({
-          paths: polygonPath,
-          strokeColor: '#1a3c2e',
-          strokeOpacity: 0.8,
-          strokeWeight: 2,
-          fillColor: '#1a3c2e',
-          fillOpacity: 0.25,
-          map: map,
-          editable: true
-        });
-
-        polygonCoordinates = polygonPath.map(p => [p.lat(), p.lng()]);
-        isDrawing = false;
-        if (drawBtn) drawBtn.classList.remove('active');
-      }
-    });
-  }
-
-  map.addListener('click', (e) => {
-    if (!isDrawing) return;
-
-    const latLng = e.latLng;
-    polygonPath.push(latLng);
-
-    const marker = new google.maps.Marker({
-      position: latLng,
-      map: map,
-      title: `Point ${polygonPath.length}`
-    });
-    markerPath.push(marker);
-
-    // Draw line connecting points
-    if (currentPolyline) currentPolyline.setMap(null);
-    currentPolyline = new google.maps.Polyline({
-      path: polygonPath,
-      geodesic: true,
-      strokeColor: '#1a3c2e',
-      strokeOpacity: 0.7,
-      strokeWeight: 2,
-      map: map
-    });
+  const drawControl = new L.Control.Draw({
+    position: 'topleft',
+    draw: {
+      polygon: true,
+      polyline: false,
+      rectangle: false,
+      circle: false,
+      marker: false,
+      circlemarker: false
+    },
+    edit: {
+      featureGroup: drawnItems,
+      remove: true
+    }
   });
+  map.addControl(drawControl);
 
-  function clearDrawing() {
-    polygonPath = [];
-    markerPath.forEach(m => m.setMap(null));
-    markerPath = [];
-    if (currentPolyline) currentPolyline.setMap(null);
-    currentPolyline = null;
-    polygonCoordinates = [];
-  }
+  // Capture polygon when drawn
+  map.on(L.Draw.Event.CREATED, (e) => {
+    const layer = e.layer;
+    drawnItems.addLayer(layer);
+
+    if (layer instanceof L.Polygon) {
+      const latlngs = layer.getLatLngs()[0];
+      polygon = layer;
+      polygonCoordinates = latlngs.map(point => [point.lat, point.lng]);
+    }
+  });
 }
 
 function enableDrawing() {
@@ -624,16 +570,15 @@ function enableDrawing() {
 }
 
 function capturePolygon() {
-  // Already captured in the Done button handler
+  // Already captured in the polygon drawing handler
 }
 
 function clearPolygon() {
   if (polygon) {
-    polygon.setMap(null);
+    polygon.removeFrom(map);
     polygon = null;
     polygonCoordinates = [];
   }
-  drawingManager.setDrawingMode(null);
   document.getElementById('drawBtn').classList.remove('active');
 }
 
