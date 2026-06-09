@@ -629,12 +629,6 @@ function renderSurveyAndSiteDetails() {
             <div class="field-value">${billingMode === 'staged' ? 'Staged 50/50' : 'Single Invoice'}</div>
           </div>
         ` : ''}
-        ${agreedAmount ? `
-          <div class="detail-field" style="grid-column:1/-1">
-            <label>Agreed Amount</label>
-            <div class="field-value" style="font-size:20px;font-weight:700;color:var(--green-mid);">£${Number(agreedAmount).toLocaleString()}</div>
-          </div>
-        ` : ''}
       </div>
     </div>
   `;
