@@ -617,6 +617,7 @@ function renderSurveyAndSiteDetails() {
               <div style="margin-bottom:10px;">
                 <label style="font-size:11px;color:var(--text-muted);">Location Tag ${job?.site_lat && job?.site_lng ? `<a href="https://what3words.com/?coords=${job.site_lat},${job.site_lng}" target="_blank" style="font-size:11px;color:var(--green-mid);font-weight:400;">Get what3words →</a>` : ''}</label>
                 <input type="text" class="form-control" id="locationTag" value="" placeholder="what3words or coordinates" style="font-size:12px;">
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Click the link above to look up what3words address from coordinates, then paste here. e.g. ///word.word.word</div>
               </div>
             `}
             ${job?.site_access_notes ? `
