@@ -35,11 +35,11 @@
 <body>
 <div class="app-layout" id="app"></div>
 
-<!-- Convert to Job Modal -->
+<!-- Approve & Convert to Job Modal -->
 <div class="modal-overlay" id="convertModal" style="display:none">
   <div class="modal">
-    <div class="modal-title">Convert to Job</div>
-    <div class="modal-sub">Review the details below before creating the job record.</div>
+    <div class="modal-title">Approve & Convert to Job</div>
+    <div class="modal-sub">Review the details below to approve and create the job. The job will be added to the map for surveyors to claim.</div>
 
     <div class="form-group">
       <label>Client Full Name <span class="req">*</span></label>
@@ -341,7 +341,7 @@ function renderEnquiry() {
             </a>` : ''}
             ${!isAccepted ? `
             <button class="btn btn-primary w-100" onclick="openConvertModal()" style="justify-content:center;background:var(--green-dark);">
-              💼 Convert to Job
+              ✅ Approve & Convert to Job
             </button>` : `
             <div style="text-align:center;font-size:13px;color:var(--green-mid);font-weight:500;padding:8px;">
               ✅ Converted to Job
@@ -721,7 +721,7 @@ async function confirmConvert() {
       home_lng: enquiry.home_lng || null,
       urgency_state: document.getElementById('cvtUrgency').value,
       job_type: 'new',
-      dispatch_state: 'pending_approval',
+      dispatch_state: 'red',
       billing_mode: document.getElementById('cvtBilling').value,
       quoted_amount: amount ? parseFloat(amount) : null,
       agreed_amount: amount ? parseFloat(amount) : null,
