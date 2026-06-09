@@ -607,33 +607,36 @@ function renderSurveyAndSiteDetails() {
             <div class="field-value">${formatDate(slaDeadline)}</div>
           </div>
         ` : ''}
-        ${hasAccessDetails ? `
-          <div style="grid-column:1/-1;margin-top:8px;padding-top:12px;border-top:1px solid var(--border);">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Site Access</div>
-            <div id="accessDisplay">
-              ${job?.site_location_tag ? `
-                <div style="margin-bottom:10px;">
-                  ${renderLocationTag(job.site_location_tag)}
-                </div>` : ''}
-              ${job?.site_access_notes ? `
-                <div style="font-size:13px;line-height:1.6;background:var(--bg);padding:12px;border-radius:8px;white-space:pre-wrap;">${job.site_access_notes}</div>` : ''}
+        <div style="grid-column:1/-1;margin-top:8px;padding-top:12px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Site Access</div>
+          <div id="accessDisplay">
+            ${job?.site_location_tag ? `
+              <div style="margin-bottom:10px;">
+                ${renderLocationTag(job.site_location_tag)}
+              </div>` : `
+              <div style="margin-bottom:10px;">
+                <label style="font-size:11px;color:var(--text-muted);">Location Tag ${job?.site_lat && job?.site_lng ? `<a href="https://what3words.com/?coords=${job.site_lat},${job.site_lng}" target="_blank" style="font-size:11px;color:var(--green-mid);font-weight:400;">Get what3words →</a>` : ''}</label>
+                <input type="text" class="form-control" id="locationTag" value="" placeholder="what3words or coordinates" style="font-size:12px;">
+              </div>
+            `}
+            ${job?.site_access_notes ? `
+              <div style="font-size:13px;line-height:1.6;background:var(--bg);padding:12px;border-radius:8px;white-space:pre-wrap;">${job.site_access_notes}</div>` : ''}
+          </div>
+          <div id="accessEditor" style="display:none;margin-top:8px;">
+            <div class="form-group">
+              <label>Location Tag ${job?.site_lat && job?.site_lng ? `<a href="https://what3words.com/?coords=${job.site_lat},${job.site_lng}" target="_blank" style="font-size:11px;color:var(--green-mid);font-weight:400;">Get what3words →</a>` : ''}</label>
+              <input type="text" class="form-control" id="locationTag" value="${job?.site_location_tag || ''}" placeholder="what3words or coordinates">
             </div>
-            <div id="accessEditor" style="display:none;margin-top:8px;">
-              <div class="form-group">
-                <label>Location Tag ${job?.site_lat && job?.site_lng ? `<a href="https://what3words.com/?coords=${job.site_lat},${job.site_lng}" target="_blank" style="font-size:11px;color:var(--green-mid);font-weight:400;">Get what3words →</a>` : ''}</label>
-                <input type="text" class="form-control" id="locationTag" value="${job?.site_location_tag || ''}" placeholder="what3words or coordinates">
-              </div>
-              <div class="form-group">
-                <label>Access Details</label>
-                <textarea class="form-control" id="accessText" rows="3" placeholder="Parking, gate codes, instructions...">${job?.site_access_notes || ''}</textarea>
-              </div>
-              <div style="display:flex;gap:8px;">
-                <button class="btn btn-secondary btn-sm" onclick="toggleAccessEditor()">Cancel</button>
-                <button class="btn btn-primary btn-sm" onclick="saveAccessNotes()">Save</button>
-              </div>
+            <div class="form-group">
+              <label>Access Details</label>
+              <textarea class="form-control" id="accessText" rows="3" placeholder="Parking, gate codes, instructions...">${job?.site_access_notes || ''}</textarea>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-secondary btn-sm" onclick="toggleAccessEditor()">Cancel</button>
+              <button class="btn btn-primary btn-sm" onclick="saveAccessNotes()">Save</button>
             </div>
           </div>
-        ` : ''}
+        </div>
       </div>
       ${hasBoundary ? `
         <div style="margin-top:16px;">
