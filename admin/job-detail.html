@@ -744,38 +744,7 @@ function renderJob() {
           ${renderInvoiceSection()}
         </div>
 
-        <!-- Progress Checklist -->
-        <div class="card" id="progressChecklist">
-          <div class="card-title">Progress Checklist</div>
-          <div style="display:flex;flex-direction:column;">
-            ${[
-              { label: 'Report Drafted',      field: 'report_drafted',      at: 'report_drafted_at',      dispatch: null },
-              { label: 'Field Data Uploaded', field: 'field_data_uploaded', at: 'field_data_uploaded_at', dispatch: 'yellow' },
-              { label: 'Report Finalised',    field: 'report_finalised',    at: 'report_finalised_at',    dispatch: 'green' },
-            ].map(item => {
-              const done = job[item.field];
-              const at   = job[item.at];
-              const hint = item.dispatch === 'yellow' ? ' — sets job to Attended 🟡'
-                         : item.dispatch === 'green'  ? ' — sets job to Report Sent 🟢'
-                         : '';
-              return `
-              <div onclick="toggleChecklist('${item.field}','${item.at}',${JSON.stringify(item.dispatch)})"
-                   style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;"
-                   class="hover-row">
-                <span style="font-size:20px;line-height:1;">${done ? '✅' : '⬜'}</span>
-                <div style="flex:1;">
-                  <div style="font-size:13px;font-weight:${done ? '600' : '400'};color:${done ? 'var(--green-dark)' : 'var(--text)'};">
-                    ${item.label}
-                  </div>
-                  ${!done && hint ? `<div style="font-size:11px;color:var(--text-muted);">${hint}</div>` : ''}
-                </div>
-                ${at ? `<span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${formatDate(at)}</span>` : ''}
-              </div>`;
-            }).join('')}
-          </div>
-        </div>
-
-        <!-- Client & Site Details (Acceptance) -->
+<!-- Client & Site Details (Acceptance) -->
         ${renderAcceptanceDetails()}
 
         <!-- Billing & Report Details -->
