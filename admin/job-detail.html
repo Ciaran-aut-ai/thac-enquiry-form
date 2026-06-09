@@ -399,30 +399,9 @@ function renderAcceptanceDetails() {
             <div style="font-size:13px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;color:var(--text);">${parkingDetails}</div>
           </div>
         ` : ''}
-        ${(enquiry?.site_boundary_polygon || job?.site_boundary_polygon) ? `
-          <div style="margin-bottom:12px;">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Site Boundary</div>
-            <div id="boundaryMapContainer" style="width:100%;height:280px;border:1px solid var(--border);border-radius:8px;background:var(--bg);"></div>
-          </div>
-        ` : ''}
       </div>
     </div>
   `;
-
-  // Display boundary map - deferred
-  setTimeout(() => {
-    try {
-      const container = document.getElementById('boundaryMapContainer');
-      if (!container) return;
-
-      const polyData = enquiry?.site_boundary_polygon || job?.site_boundary_polygon;
-      if (polyData) {
-        displayBoundaryMap();
-      }
-    } catch (e) {
-      console.error('Map error:', e);
-    }
-  }, 250);
 }
 
 function toggleAcceptanceDetails() {
@@ -555,13 +534,12 @@ function renderSurveyAndSiteDetails() {
   const addressParts = [enquiry?.site_street, enquiry?.site_city, enquiry?.site_postcode].filter(Boolean);
   const address = addressParts.join('<br>');
   const surveyDate = job?.survey_date;
-  const agreedAmount = job?.agreed_amount;
   const slaDeadline = job?.sla_deadline;
-  const billingMode = job?.billing_mode;
   const postcode = job?.site_postcode;
   const coordinates = job?.site_lat && job?.site_lng ? `${Number(job.site_lat).toFixed(5)}, ${Number(job.site_lng).toFixed(5)}` : null;
+  const hasBoundary = enquiry?.site_boundary_polygon || job?.site_boundary_polygon;
 
-  if (!surveyType && !treeCount && !address && !surveyDate && !agreedAmount && !slaDeadline && !postcode) return '';
+  if (!surveyType && !treeCount && !address && !surveyDate && !slaDeadline && !postcode && !hasBoundary) return '';
 
   return `
     <div class="card">
@@ -624,8 +602,28 @@ function renderSurveyAndSiteDetails() {
           </div>
         ` : ''}
       </div>
+      ${hasBoundary ? `
+        <div style="margin-top:16px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Site Boundary</div>
+          <div id="boundaryMapContainer" style="width:100%;height:280px;border:1px solid var(--border);border-radius:8px;background:var(--bg);"></div>
+        </div>
+      ` : ''}
     </div>
   `;
+
+  // Display boundary map - deferred
+  setTimeout(() => {
+    try {
+      const container = document.getElementById('boundaryMapContainer');
+      if (!container) return;
+      const polyData = enquiry?.site_boundary_polygon || job?.site_boundary_polygon;
+      if (polyData) {
+        displayBoundaryMap();
+      }
+    } catch (e) {
+      console.error('Map error:', e);
+    }
+  }, 250);
 }
 
 function renderJob() {
