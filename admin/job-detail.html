@@ -174,7 +174,7 @@ async function loadJob() {
       const enqData = await dbGet('enquiries', {
         'id': `eq.${job.enquiry_id}`,
         'limit': 1,
-        'select': 'id,billing_contact_name,billing_contact_email,billing_address,end_client_name,end_client_email,report_addressee_name,report_addressee_address,report_title,access_details,parking_details,site_boundary_polygon,tree_count_band,contact_phone,site_full_address,company_name'
+        'select': 'id,billing_contact_name,billing_contact_email,billing_address,end_client_name,end_client_email,report_addressee_name,report_addressee_address,report_title,access_details,parking_details,site_boundary_polygon,tree_count_band,contact_phone,site_street,site_city,site_postcode,company_name'
       });
       enquiry = (enqData && enqData.length) ? enqData[0] : null;
     }
@@ -552,7 +552,8 @@ function renderContactDetails() {
 function renderSurveyDetails() {
   const surveyType = enquiry?.survey_type || job?.survey_type || job?.job_type;
   const treeCount = enquiry?.tree_count_band;
-  const address = enquiry?.site_full_address;
+  const addressParts = [enquiry?.site_street, enquiry?.site_city, enquiry?.site_postcode].filter(Boolean);
+  const address = addressParts.join('<br>');
   const surveyDate = job?.survey_date;
   const agreedAmount = job?.agreed_amount;
 
