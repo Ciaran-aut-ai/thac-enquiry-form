@@ -174,7 +174,7 @@ async function loadJob() {
       const enqData = await dbGet('enquiries', {
         'id': `eq.${job.enquiry_id}`,
         'limit': 1,
-        'select': 'id,billing_contact_name,billing_contact_email,billing_address,end_client_name,end_client_email,report_addressee_name,report_addressee_address,report_title,access_details,parking_details,site_boundary_polygon,tree_count_band,contact_phone,site_street,site_city,site_postcode,company_name'
+        'select': '*'
       });
       enquiry = (enqData && enqData.length) ? enqData[0] : null;
     }
@@ -509,9 +509,9 @@ function displayBoundaryMap() {
 }
 
 function renderContactDetails() {
-  const name = enquiry?.billing_contact_name || job?.billing_contact_name;
-  const company = enquiry?.company_name;
-  const email = enquiry?.billing_contact_email || job?.billing_contact_email;
+  const name = enquiry?.contact_name || job?.billing_contact_name;
+  const company = enquiry?.company;
+  const email = enquiry?.contact_email || job?.billing_contact_email;
   const phone = enquiry?.contact_phone;
 
   if (!name && !email && !phone) return '';
