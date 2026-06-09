@@ -721,7 +721,7 @@ async function confirmConvert() {
       home_lng: enquiry.home_lng || null,
       urgency_state: document.getElementById('cvtUrgency').value,
       job_type: 'new',
-      dispatch_state: 'red',
+      dispatch_state: 'pending_approval',
       billing_mode: document.getElementById('cvtBilling').value,
       quoted_amount: amount ? parseFloat(amount) : null,
       agreed_amount: amount ? parseFloat(amount) : null,
