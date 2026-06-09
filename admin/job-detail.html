@@ -549,19 +549,23 @@ function renderContactDetails() {
   `;
 }
 
-function renderSurveyDetails() {
+function renderSurveyAndSiteDetails() {
   const surveyType = enquiry?.survey_type || job?.survey_type || job?.job_type;
   const treeCount = enquiry?.tree_count_band;
   const addressParts = [enquiry?.site_street, enquiry?.site_city, enquiry?.site_postcode].filter(Boolean);
   const address = addressParts.join('<br>');
   const surveyDate = job?.survey_date;
   const agreedAmount = job?.agreed_amount;
+  const slaDeadline = job?.sla_deadline;
+  const billingMode = job?.billing_mode;
+  const postcode = job?.site_postcode;
+  const coordinates = job?.site_lat && job?.site_lng ? `${Number(job.site_lat).toFixed(5)}, ${Number(job.site_lng).toFixed(5)}` : null;
 
-  if (!surveyType && !treeCount && !address && !surveyDate && !agreedAmount) return '';
+  if (!surveyType && !treeCount && !address && !surveyDate && !agreedAmount && !slaDeadline && !postcode) return '';
 
   return `
     <div class="card">
-      <div class="card-title">Survey Details</div>
+      <div class="card-title">Survey & Site Details</div>
       <div class="detail-grid">
         ${surveyType ? `
           <div class="detail-field">
@@ -578,7 +582,13 @@ function renderSurveyDetails() {
         ${address ? `
           <div class="detail-field" style="grid-column:1/-1">
             <label>Site Address</label>
-            <div class="field-value">${address}</div>
+            <div class="field-value">${address}${postcode && !address.includes(postcode) ? `<br><a href="https://maps.google.com/?q=${postcode}" target="_blank" style="font-size:12px;color:var(--green-mid);margin-top:4px;display:inline-block;">View on Google Maps →</a>` : ''}</div>
+          </div>
+        ` : ''}
+        ${coordinates ? `
+          <div class="detail-field" style="grid-column:1/-1">
+            <label>Coordinates</label>
+            <div class="field-value" style="font-size:12px;color:var(--text-muted);">📍 ${coordinates}</div>
           </div>
         ` : ''}
         ${surveyDate ? `
@@ -587,6 +597,18 @@ function renderSurveyDetails() {
             <div class="field-value" style="font-weight:600;color:${job?.survey_date_confirmed ? 'var(--green-mid)' : '#f97316'};">
               ${job?.survey_date_confirmed ? '🟢 Confirmed' : '🟠 Proposed'}: ${formatDate(surveyDate)}
             </div>
+          </div>
+        ` : ''}
+        ${slaDeadline ? `
+          <div class="detail-field">
+            <label>SLA Deadline</label>
+            <div class="field-value">${formatDate(slaDeadline)}</div>
+          </div>
+        ` : ''}
+        ${billingMode ? `
+          <div class="detail-field">
+            <label>Billing Mode</label>
+            <div class="field-value">${billingMode === 'staged' ? 'Staged 50/50' : 'Single Invoice'}</div>
           </div>
         ` : ''}
         ${agreedAmount ? `
@@ -619,67 +641,8 @@ function renderJob() {
         <!-- Contact Details -->
         ${renderContactDetails()}
 
-        <!-- Survey Details -->
-        ${renderSurveyDetails()}
-
-        <!-- Site Details -->
-        <div class="card">
-          <div class="card-title">Site Details</div>
-          <div class="detail-grid">
-            <div class="detail-field">
-              <label>Site Postcode</label>
-              <div class="field-value">
-                <strong>${job.site_postcode || '—'}</strong>
-                ${job.site_postcode ? `<br><a href="https://maps.google.com/?q=${job.site_postcode}" target="_blank" style="font-size:12px;color:var(--green-mid);">View on Google Maps →</a>` : ''}
-                ${job.site_lat
-                  ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">📍 ${Number(job.site_lat).toFixed(5)}, ${Number(job.site_lng).toFixed(5)}</div>`
-                  : job.site_postcode
-                    ? `<div style="margin-top:6px;"><button class="btn btn-secondary btn-sm" onclick="geocodePostcode()">📍 Get Coordinates</button></div>`
-                    : ''}
-              </div>
-            </div>
-            <div class="detail-field">
-              <label>Survey Type</label>
-              <div class="field-value">${getSurveyLabel(job.survey_type || job.job_type)}</div>
-            </div>
-            <div class="detail-field" style="grid-column:1/-1">
-              <label>Survey Date</label>
-              <div id="surveyDateDisplay" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                ${job.survey_date
-                  ? `<span style="font-weight:600;color:${job.survey_date_confirmed ? 'var(--green-mid)' : '#f97316'};">
-                       ${job.survey_date_confirmed ? '🟢 Confirmed' : '🟠 Proposed'}: ${formatDate(job.survey_date)}
-                     </span>`
-                  : `<span style="color:var(--text-muted);">Not set</span>`}
-                <button class="btn btn-secondary btn-sm" onclick="toggleSurveyDateEdit()">
-                  ${job.survey_date ? 'Edit' : 'Set date'}
-                </button>
-              </div>
-              <div id="surveyDateEdit" style="display:none;margin-top:8px;">
-                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                  <input type="date" class="form-control" id="surveyDateInput" value="${job.survey_date || ''}" style="width:auto;">
-                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:400;">
-                    <input type="checkbox" id="surveyDateConfirmed" ${job.survey_date_confirmed ? 'checked' : ''}>
-                    Client confirmed
-                  </label>
-                  <button class="btn btn-secondary btn-sm" onclick="toggleSurveyDateEdit()">Cancel</button>
-                  <button class="btn btn-primary btn-sm" onclick="saveSurveyDate()">Save</button>
-                </div>
-              </div>
-            </div>
-            <div class="detail-field">
-              <label>SLA Deadline</label>
-              <div class="field-value">${formatDate(job.sla_deadline)}</div>
-            </div>
-            <div class="detail-field">
-              <label>Estimated Trees</label>
-              <div class="field-value">${job.estimated_tree_count || '—'}</div>
-            </div>
-            <div class="detail-field">
-              <label>Billing Mode</label>
-              <div class="field-value">${job.billing_mode === 'staged' ? 'Staged 50/50' : 'Single Invoice'}</div>
-            </div>
-          </div>
-        </div>
+        <!-- Survey & Site Details -->
+        ${renderSurveyAndSiteDetails()}
 
         <!-- Financial -->
         <div class="card">
