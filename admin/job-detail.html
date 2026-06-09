@@ -623,12 +623,6 @@ function renderSurveyAndSiteDetails() {
             <div class="field-value">${formatDate(slaDeadline)}</div>
           </div>
         ` : ''}
-        ${billingMode ? `
-          <div class="detail-field">
-            <label>Billing Mode</label>
-            <div class="field-value">${billingMode === 'staged' ? 'Staged 50/50' : 'Single Invoice'}</div>
-          </div>
-        ` : ''}
       </div>
     </div>
   `;
@@ -682,6 +676,10 @@ function renderJob() {
               <div class="detail-field">
                 <label>Surveyor Pay</label>
                 <div class="field-value">${job.surveyor_pay_amount ? '£' + Number(job.surveyor_pay_amount).toLocaleString() : '—'}</div>
+              </div>
+              <div class="detail-field">
+                <label>Billing Mode</label>
+                <div class="field-value">${job.billing_mode === 'staged' ? 'Staged 50/50' : 'Single Invoice'}</div>
               </div>
             </div>
           </div>
