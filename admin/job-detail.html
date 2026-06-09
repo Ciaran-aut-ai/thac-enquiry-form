@@ -582,7 +582,7 @@ function renderSurveyAndSiteDetails() {
         ${address ? `
           <div class="detail-field" style="grid-column:1/-1">
             <label>Site Address</label>
-            <div class="field-value">${address}${postcode && !address.includes(postcode) ? `<br><a href="https://maps.google.com/?q=${postcode}" target="_blank" style="font-size:12px;color:var(--green-mid);margin-top:4px;display:inline-block;">View on Google Maps →</a>` : ''}</div>
+            <div class="field-value">${address}<br><a href="https://maps.google.com/?q=${postcode}" target="_blank" style="font-size:12px;color:var(--green-mid);">View on Google Maps →</a></div>
           </div>
         ` : ''}
         ${coordinates ? `
@@ -590,12 +590,30 @@ function renderSurveyAndSiteDetails() {
             <label>Coordinates</label>
             <div class="field-value" style="font-size:12px;color:var(--text-muted);">📍 ${coordinates}</div>
           </div>
+        ` : job?.site_postcode && !coordinates ? `
+          <div class="detail-field" style="grid-column:1/-1">
+            <button class="btn btn-secondary btn-sm" onclick="geocodePostcode()">📍 Get Coordinates</button>
+          </div>
         ` : ''}
         ${surveyDate ? `
           <div class="detail-field" style="grid-column:1/-1">
             <label>Survey Date</label>
-            <div class="field-value" style="font-weight:600;color:${job?.survey_date_confirmed ? 'var(--green-mid)' : '#f97316'};">
-              ${job?.survey_date_confirmed ? '🟢 Confirmed' : '🟠 Proposed'}: ${formatDate(surveyDate)}
+            <div id="surveyDateDisplay" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="font-weight:600;color:${job?.survey_date_confirmed ? 'var(--green-mid)' : '#f97316'};">
+                ${job?.survey_date_confirmed ? '🟢 Confirmed' : '🟠 Proposed'}: ${formatDate(surveyDate)}
+              </span>
+              <button class="btn btn-secondary btn-sm" onclick="toggleSurveyDateEdit()">Edit</button>
+            </div>
+            <div id="surveyDateEdit" style="display:none;margin-top:8px;">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <input type="date" class="form-control" id="surveyDateInput" value="${job?.survey_date || ''}" style="width:auto;">
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:400;">
+                  <input type="checkbox" id="surveyDateConfirmed" ${job?.survey_date_confirmed ? 'checked' : ''}>
+                  Client confirmed
+                </label>
+                <button class="btn btn-secondary btn-sm" onclick="toggleSurveyDateEdit()">Cancel</button>
+                <button class="btn btn-primary btn-sm" onclick="saveSurveyDate()">Save</button>
+              </div>
             </div>
           </div>
         ` : ''}
