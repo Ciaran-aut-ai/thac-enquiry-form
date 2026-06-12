@@ -41,12 +41,16 @@
       margin-bottom: 16px;
       text-align: center;
     }
-    .calendar {
-      display: grid;
-      grid-template-columns: 150px repeat(31, 30px);
-      gap: 1px;
-      background: #e5e7eb;
-      padding: 1px;
+    .calendar-container {
+      display: flex;
+      gap: 0;
+      background: white;
+    }
+    .surveyor-names-column {
+      display: flex;
+      flex-direction: column;
+      background: #f9fafb;
+      border-right: 2px solid #d1d5db;
     }
     .surveyor-name {
       background: #f9fafb;
@@ -54,13 +58,27 @@
       font-weight: 600;
       font-size: 13px;
       color: #1a3c2e;
-      border-right: 2px solid #d1d5db;
+      min-height: 40px;
       display: flex;
       align-items: center;
-      min-height: 40px;
+      width: 150px;
+      border-bottom: 1px solid #e5e7eb;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .surveyor-name.header {
+      background: #f3f4f6;
+      font-weight: 700;
+      border-bottom: none;
+    }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(31, 30px);
+      gap: 1px;
+      background: #e5e7eb;
+      padding: 1px;
+      overflow-x: auto;
     }
     .day-header {
       background: #f3f4f6;
@@ -153,7 +171,10 @@
             <div id="content" style="display:none;">
               <div class="calendar-wrapper">
                 <div class="month-header" id="monthHeader"></div>
-                <div class="calendar" id="calendar"></div>
+                <div class="calendar-container">
+                  <div class="surveyor-names-column" id="namesColumn"></div>
+                  <div class="calendar" id="calendar"></div>
+                </div>
               </div>
               <div class="legend">
                 <div class="legend-item">
@@ -217,10 +238,17 @@
       document.getElementById('monthHeader').textContent = monthName;
 
       const calendar = document.getElementById('calendar');
+      const namesColumn = document.getElementById('namesColumn');
       calendar.innerHTML = '';
+      namesColumn.innerHTML = '';
 
-      // Add day headers
-      calendar.innerHTML += '<div class="surveyor-name"></div>';
+      // Add header to names column
+      const headerName = document.createElement('div');
+      headerName.className = 'surveyor-name header';
+      headerName.textContent = 'Surveyor';
+      namesColumn.appendChild(headerName);
+
+      // Add day headers to calendar
       for (let d = 1; d <= daysInMonth; d++) {
         const cell = document.createElement('div');
         cell.className = 'day-header';
@@ -229,17 +257,16 @@
       }
 
       // Add surveyor rows (filter active only)
-      console.log('Surveyors data:', surveyors);
       const activeSurveyors = (surveyors || []).filter(s => s.is_active);
-      console.log('Active surveyors:', activeSurveyors);
 
       activeSurveyors.forEach((surveyor, idx) => {
-        console.log(`Adding row for surveyor ${idx}:`, surveyor.full_name);
+        // Add name to names column
         const nameCell = document.createElement('div');
         nameCell.className = 'surveyor-name';
         nameCell.textContent = surveyor.full_name;
-        calendar.appendChild(nameCell);
+        namesColumn.appendChild(nameCell);
 
+        // Add day cells to calendar
         for (let d = 1; d <= daysInMonth; d++) {
           const dateStr = new Date(year, month, d).toISOString().split('T')[0];
           const cell = document.createElement('div');
