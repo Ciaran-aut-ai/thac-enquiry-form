@@ -222,12 +222,16 @@
         calendar.appendChild(cell);
       }
 
-      // Add surveyor rows
+      // Add surveyor rows (filter active only)
       console.log('Surveyors data:', surveyors);
-      (surveyors || []).forEach((surveyor, idx) => {
+      const activeSurveyors = (surveyors || []).filter(s => s.is_active);
+      console.log('Active surveyors:', activeSurveyors);
+
+      activeSurveyors.forEach((surveyor, idx) => {
+        console.log(`Adding row for surveyor ${idx}:`, surveyor.full_name);
         const nameCell = document.createElement('div');
         nameCell.className = 'surveyor-name';
-        nameCell.textContent = surveyor?.full_name || `Surveyor ${idx + 1}`;
+        nameCell.textContent = surveyor.full_name;
         calendar.appendChild(nameCell);
 
         for (let d = 1; d <= daysInMonth; d++) {
