@@ -185,7 +185,10 @@
 
     try {
       // Load surveyors
-      const surveyors = await dbGet('surveyors', { 'is_active': 'eq.true', 'select': 'id,full_name', 'order': 'full_name.asc' });
+      const surveyors = await dbGet('surveyors', {
+        'select': 'id,full_name,is_active',
+        'order': 'full_name.asc'
+      });
 
       // Load time off for this month
       const start = new Date(year, month, 1);
@@ -193,7 +196,9 @@
       const startStr = start.toISOString().split('T')[0];
       const endStr = end.toISOString().split('T')[0];
 
-      const timeOff = await dbGet('surveyor_time_off', { 'start_date': 'gte.' + startStr, 'end_date': 'lt.' + endStr, 'select': 'surveyor_id,start_date,end_date' });
+      const timeOff = await dbGet('surveyor_time_off', {
+        'select': 'surveyor_id,start_date,end_date'
+      });
 
       if (!surveyors || !Array.isArray(surveyors)) {
         throw new Error('Failed to load surveyors');
