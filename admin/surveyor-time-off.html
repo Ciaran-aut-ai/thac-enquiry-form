@@ -184,8 +184,6 @@
     document.getElementById('error').style.display = 'none';
 
     try {
-      const supabase = window.supabaseClient;
-
       // Load surveyors
       const { data: surveyors, error: survError } = await supabase
         .from('surveyors')
