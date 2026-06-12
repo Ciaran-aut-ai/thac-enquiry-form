@@ -3,24 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Surveyor Time Off — Admin</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>Surveyor Availability — THAC Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/thac.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'DM Sans', sans-serif;
-      background: #f0f7f4;
-      padding: 24px;
-      min-height: 100vh;
-    }
-    .container { max-width: 1400px; margin: 0 auto; }
-    h1 {
-      font-size: 28px;
-      font-weight: 700;
-      color: #1a3c2e;
-      margin-bottom: 24px;
-    }
     .controls {
       display: flex;
       gap: 12px;
@@ -28,7 +14,7 @@
     }
     select, button {
       padding: 10px 16px;
-      border: 1px solid #d1d5db;
+      border: 1px solid var(--border);
       border-radius: 6px;
       font-size: 14px;
       font-family: inherit;
@@ -45,7 +31,7 @@
       background: white;
       border-radius: 12px;
       padding: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      box-shadow: var(--shadow-sm);
       overflow-x: auto;
     }
     .month-header {
@@ -91,9 +77,6 @@
       background: #fee2e2;
       border: 1px solid #fca5a5;
     }
-    .day-off.multi {
-      background: #fecaca;
-    }
     .day-number {
       font-size: 10px;
       color: #9ca3af;
@@ -121,62 +104,63 @@
       padding: 40px;
       color: #666;
     }
-    .error {
-      background: #fee2e2;
-      border: 1px solid #fca5a5;
-      color: #991b1b;
-      padding: 16px;
-      border-radius: 6px;
-      margin-bottom: 16px;
-    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Surveyor Time Off Calendar</h1>
+<div class="app-layout" id="app"></div>
+<script src="js/supabase.js"></script>
+<script src="js/thac.js"></script>
+<script>
+  requireAuth();
+  const today = new Date();
 
-    <div class="controls">
-      <select id="monthSelect">
-        <option value="0">January</option>
-        <option value="1">February</option>
-        <option value="2">March</option>
-        <option value="3">April</option>
-        <option value="4">May</option>
-        <option value="5">June</option>
-        <option value="6">July</option>
-        <option value="7">August</option>
-        <option value="8">September</option>
-        <option value="9">October</option>
-        <option value="10">November</option>
-        <option value="11">December</option>
-      </select>
-      <select id="yearSelect"></select>
-      <button onclick="loadCalendar()">Load</button>
-    </div>
-
-    <div id="error" class="error" style="display:none;"></div>
-    <div id="loading" class="loading">Loading...</div>
-    <div id="content" style="display:none;">
-      <div class="calendar-wrapper">
-        <div class="month-header" id="monthHeader"></div>
-        <div class="calendar" id="calendar"></div>
-      </div>
-      <div class="legend">
-        <div class="legend-item">
-          <div class="legend-color" style="background: #fee2e2;"></div>
-          <span>Time Off</span>
+  async function initPage() {
+    document.getElementById('app').innerHTML = `
+      ${renderSidebar('availability')}
+      <div class="main-content">
+        <div class="topbar">
+          <div class="topbar-title">Surveyor Availability</div>
+        </div>
+        <div class="page-body">
+          <div class="card">
+            <div class="card-title">Surveyor Time Off Calendar</div>
+            <div class="controls">
+              <select id="monthSelect">
+                <option value="0">January</option>
+                <option value="1">February</option>
+                <option value="2">March</option>
+                <option value="3">April</option>
+                <option value="4">May</option>
+                <option value="5">June</option>
+                <option value="6">July</option>
+                <option value="7">August</option>
+                <option value="8">September</option>
+                <option value="9">October</option>
+                <option value="10">November</option>
+                <option value="11">December</option>
+              </select>
+              <select id="yearSelect"></select>
+              <button onclick="loadCalendar()">Load</button>
+            </div>
+            <div id="error" style="display:none;background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;padding:16px;border-radius:6px;margin-bottom:16px;"></div>
+            <div id="loading" class="loading">Loading...</div>
+            <div id="content" style="display:none;">
+              <div class="calendar-wrapper">
+                <div class="month-header" id="monthHeader"></div>
+                <div class="calendar" id="calendar"></div>
+              </div>
+              <div class="legend">
+                <div class="legend-item">
+                  <div class="legend-color" style="background: #fee2e2;"></div>
+                  <span>Time Off</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
+    `;
 
-  <script>
-    const SUPABASE_URL = 'https://bjqjznoxrzzlppqkpfyt.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcWp6bm94cnp6bHBwcWtwZnl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTQ1MTQ0NjksImV4cCI6MjAzMDA5NDQ2OX0.u_xmhPu35p-w75lNAx9F-bGr7yC5ZnJp3nU4SY4DqMw';
-    const { createClient } = window.supabase;
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    const today = new Date();
     document.getElementById('monthSelect').value = today.getMonth();
 
     // Populate year select
@@ -188,97 +172,98 @@
       document.getElementById('yearSelect').appendChild(opt);
     }
 
-    async function loadCalendar() {
-      const month = parseInt(document.getElementById('monthSelect').value);
-      const year = parseInt(document.getElementById('yearSelect').value);
+    loadCalendar();
+  }
 
-      document.getElementById('loading').style.display = 'block';
-      document.getElementById('content').style.display = 'none';
-      document.getElementById('error').style.display = 'none';
+  async function loadCalendar() {
+    const month = parseInt(document.getElementById('monthSelect').value);
+    const year = parseInt(document.getElementById('yearSelect').value);
 
-      try {
-        // Load surveyors
-        const { data: surveyors, error: survError } = await supabase
-          .from('surveyors')
-          .select('id, full_name')
-          .eq('is_active', true)
-          .order('full_name');
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('content').style.display = 'none';
+    document.getElementById('error').style.display = 'none';
 
-        if (survError) throw survError;
+    try {
+      const supabase = window.supabaseClient;
 
-        // Load time off for this month
-        const start = new Date(year, month, 1);
-        const end = new Date(year, month + 1, 1);
-        const startStr = start.toISOString().split('T')[0];
-        const endStr = end.toISOString().split('T')[0];
+      // Load surveyors
+      const { data: surveyors, error: survError } = await supabase
+        .from('surveyors')
+        .select('id, full_name')
+        .eq('is_active', true)
+        .order('full_name');
 
-        const { data: timeOff, error: timeOffError } = await supabase
-          .from('surveyor_time_off')
-          .select('surveyor_id, start_date, end_date')
-          .gte('start_date', startStr)
-          .lt('end_date', endStr);
+      if (survError) throw survError;
 
-        if (timeOffError) throw timeOffError;
+      // Load time off for this month
+      const start = new Date(year, month, 1);
+      const end = new Date(year, month + 1, 1);
+      const startStr = start.toISOString().split('T')[0];
+      const endStr = end.toISOString().split('T')[0];
 
-        // Build calendar
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const monthName = new Date(year, month).toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+      const { data: timeOff, error: timeOffError } = await supabase
+        .from('surveyor_time_off')
+        .select('surveyor_id, start_date, end_date')
+        .gte('start_date', startStr)
+        .lt('end_date', endStr);
 
-        document.getElementById('monthHeader').textContent = monthName;
+      if (timeOffError) throw timeOffError;
 
-        const calendar = document.getElementById('calendar');
-        calendar.innerHTML = '';
+      // Build calendar
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const monthName = new Date(year, month).toLocaleString('en-GB', { month: 'long', year: 'numeric' });
 
-        // Add day headers
-        calendar.innerHTML += '<div class="surveyor-name"></div>';
+      document.getElementById('monthHeader').textContent = monthName;
+
+      const calendar = document.getElementById('calendar');
+      calendar.innerHTML = '';
+
+      // Add day headers
+      calendar.innerHTML += '<div class="surveyor-name"></div>';
+      for (let d = 1; d <= daysInMonth; d++) {
+        const cell = document.createElement('div');
+        cell.className = 'day-header';
+        cell.textContent = d;
+        calendar.appendChild(cell);
+      }
+
+      // Add surveyor rows
+      surveyors.forEach(surveyor => {
+        const nameCell = document.createElement('div');
+        nameCell.className = 'surveyor-name';
+        nameCell.textContent = surveyor.full_name;
+        calendar.appendChild(nameCell);
+
         for (let d = 1; d <= daysInMonth; d++) {
+          const dateStr = new Date(year, month, d).toISOString().split('T')[0];
           const cell = document.createElement('div');
-          cell.className = 'day-header';
-          cell.textContent = d;
+          cell.className = 'day-cell';
+
+          const hasTimeOff = timeOff.some(to => {
+            const start = new Date(to.start_date);
+            const end = new Date(to.end_date);
+            const current = new Date(year, month, d);
+            return current >= start && current <= end;
+          });
+
+          if (hasTimeOff) {
+            cell.className += ' day-off';
+          }
+          cell.innerHTML = `<span class="day-number">${d}</span>`;
           calendar.appendChild(cell);
         }
+      });
 
-        // Add surveyor rows
-        surveyors.forEach(surveyor => {
-          // Surveyor name
-          const nameCell = document.createElement('div');
-          nameCell.className = 'surveyor-name';
-          nameCell.textContent = surveyor.full_name;
-          calendar.appendChild(nameCell);
-
-          // Days
-          for (let d = 1; d <= daysInMonth; d++) {
-            const dateStr = new Date(year, month, d).toISOString().split('T')[0];
-            const cell = document.createElement('div');
-            cell.className = 'day-cell';
-
-            // Check if surveyor has time off this day
-            const hasTimeOff = timeOff.some(to => {
-              const start = new Date(to.start_date);
-              const end = new Date(to.end_date);
-              const current = new Date(year, month, d);
-              return current >= start && current <= end;
-            });
-
-            if (hasTimeOff) {
-              cell.className += ' day-off';
-            }
-            cell.innerHTML = `<span class="day-number">${d}</span>`;
-            calendar.appendChild(cell);
-          }
-        });
-
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('content').style.display = 'block';
-      } catch (err) {
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('error').style.display = 'block';
-        document.getElementById('error').textContent = err.message;
-      }
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+    } catch (err) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('error').textContent = err.message;
     }
+  }
 
-    // Load on page load
-    loadCalendar();
-  </script>
+  initPage();
+</script>
 </body>
 </html>

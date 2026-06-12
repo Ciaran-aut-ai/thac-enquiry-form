@@ -211,6 +211,9 @@ function renderSidebar(activePage) {
         <a href="surveyors.html" class="nav-item ${activePage === 'surveyors' ? 'active' : ''}" data-page="surveyors">
           <span class="nav-icon">🔍</span> Surveyors
         </a>
+        <a href="surveyor-time-off.html" class="nav-item ${activePage === 'availability' ? 'active' : ''}" data-page="availability">
+          <span class="nav-icon">📅</span> Availability
+        </a>
         <a href="resources.html" class="nav-item ${activePage === 'resources' ? 'active' : ''}" data-page="resources">
           <span class="nav-icon">📚</span> Resources
         </a>
