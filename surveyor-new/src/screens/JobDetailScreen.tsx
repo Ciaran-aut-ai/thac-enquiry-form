@@ -7,6 +7,7 @@ import MapView, { Polygon } from 'react-native-maps';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { Job, RootStackParamList } from '../types';
+import NDAModal from './NDAModal';
 
 type RouteProps = RouteProp<RootStackParamList, 'JobDetail'>;
 
@@ -108,6 +109,7 @@ export default function JobDetailScreen() {
   const [surveyor,   setSurveyor]   = useState<any>(null);
   const [surveyHours, setSurveyHours] = useState(1);
   const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
+  const [showNDA, setShowNDA] = useState(false);
 
   useEffect(() => { loadData(); }, []);
 
@@ -191,16 +193,37 @@ export default function JobDetailScreen() {
     ]);
   }
 
-  async function claimJob() {
+  function claimJob() {
     if (!surveyorId) { Alert.alert('Error', 'Surveyor profile not found.'); return; }
-    Alert.alert('Claim Job', 'Confirm you want to claim this job?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Claim', onPress: async () => {
-        const { error } = await supabase.rpc('claim_job', { p_job_id: jobId, p_surveyor_id: surveyorId });
-        if (error) Alert.alert('Error', error.message);
-        else { Alert.alert('Claimed!', 'Job is now assigned to you.'); loadData(); }
-      }},
-    ]);
+    setShowNDA(true);
+  }
+
+  async function acceptNDAAndClaim() {
+    if (!surveyorId || !job?.id) return;
+
+    try {
+      // Record NDA acceptance
+      const { error: ndaError } = await supabase
+        .from('job_nda_acceptance')
+        .insert([{
+          job_id: job.id,
+          surveyor_id: surveyorId,
+        }]);
+
+      if (ndaError) throw ndaError;
+
+      // Claim the job
+      const { error } = await supabase.rpc('claim_job', { p_job_id: jobId, p_surveyor_id: surveyorId });
+      if (error) Alert.alert('Error', error.message);
+      else {
+        Alert.alert('Claimed!', 'Job is now assigned to you.');
+        loadData();
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to claim job');
+    }
+
+    setShowNDA(false);
   }
 
   async function handBack() {
@@ -502,6 +525,11 @@ export default function JobDetailScreen() {
         )}
       </View>
 
+      <NDAModal
+        visible={showNDA}
+        onAccept={acceptNDAAndClaim}
+        onDismiss={() => setShowNDA(false)}
+      />
     </ScrollView>
   );
 }
