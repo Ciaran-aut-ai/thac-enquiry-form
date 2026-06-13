@@ -267,19 +267,37 @@ export default function JobDetailScreen() {
     ]);
   }
 
-  async function claimAllocatedJob() {
+  function claimAllocatedJob() {
     if (!surveyorId) { Alert.alert('Error', 'Surveyor profile not found.'); return; }
-    Alert.alert('Claim Job', 'Confirm you want to claim this allocated job?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Claim', onPress: async () => {
-        const { error } = await supabase.from('jobs').update({
+    setShowNDA(true);
+  }
+
+  async function acceptNDAAndClaimAllocated() {
+    if (!surveyorId || !job?.id) return;
+
+    try {
+      // Record NDA acceptance
+      const { error: ndaError } = await supabase
+        .from('job_nda_acceptance')
+        .insert([{
+          job_id: job.id,
           surveyor_id: surveyorId,
-          dispatch_state: 'orange',
-        }).eq('id', jobId);
-        if (error) Alert.alert('Error', error.message);
-        else { Alert.alert('✅ Claimed!', 'Job is assigned to you.'); loadData(); }
-      }},
-    ]);
+        }]);
+
+      if (ndaError) throw ndaError;
+
+      // Claim the allocated job
+      const { error } = await supabase.from('jobs').update({
+        surveyor_id: surveyorId,
+        dispatch_state: 'orange',
+      }).eq('id', jobId);
+      if (error) Alert.alert('Error', error.message);
+      else { Alert.alert('✅ Claimed!', 'Job is assigned to you.'); loadData(); }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to claim job');
+    }
+
+    setShowNDA(false);
   }
 
   async function rejectAllocatedJob() {
@@ -527,7 +545,7 @@ export default function JobDetailScreen() {
 
       <NDAModal
         visible={showNDA}
-        onAccept={acceptNDAAndClaim}
+        onAccept={job?.allocated_surveyor_id ? acceptNDAAndClaimAllocated : acceptNDAAndClaim}
         onDismiss={() => setShowNDA(false)}
       />
     </ScrollView>
