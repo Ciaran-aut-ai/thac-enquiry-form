@@ -1028,18 +1028,10 @@ function renderNDAStatus() {
   if (!job.surveyor_id) return '';
 
   const nda = job.nda_acceptance;
-  if (!nda) {
-    return `
-      <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:12px;">
-        <div style="font-size:13px;color:#991b1b;font-weight:600;">⚠️ NDA Pending</div>
-        <div style="font-size:12px;color:#991b1b;margin-top:4px;">Surveyor must accept NDA before submitting work</div>
-      </div>`;
-  }
-
   return `
     <div style="background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:12px;">
       <div style="font-size:13px;color:#166534;font-weight:600;">✅ NDA Accepted</div>
-      <div style="font-size:12px;color:#166534;margin-top:4px;">${formatDateTime(nda.accepted_at)}</div>
+      <div style="font-size:12px;color:#166534;margin-top:4px;">${nda?.accepted_at ? formatDateTime(nda.accepted_at) : 'Upon job claim'}</div>
     </div>`;
 }
 
