@@ -227,6 +227,32 @@ function getAreaFromPostcodeSync(postcode) {
   return areaMap[code] || null;
 }
 
+async function getAreaFromPostcodeAPI(postcode) {
+  if (!postcode) return null;
+
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(postcode)}&components=country:UK&key=${GOOGLE_MAPS_KEY}`;
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.status !== 'OK' || !data.results.length) return null;
+
+    const result = data.results[0];
+    for (const component of result.address_components) {
+      if (component.types.includes('administrative_area_level_2')) {
+        return component.long_name;
+      }
+      if (component.types.includes('administrative_area_level_1')) {
+        return component.long_name;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Geocoding error:', error);
+    return null;
+  }
+}
+
 async function renderTable() {
   let filtered = [...allSurveyors];
 
@@ -274,7 +300,7 @@ async function renderTable() {
     } else {
       statusBadge = `<span class="badge badge-low">⏸ Paused</span>`;
     }
-    const area = await getAreaFromPostcode(s.home_postcode);
+    const area = await getAreaFromPostcodeAPI(s.home_postcode);
     const postcodeDisplay = s.home_postcode ? `${s.home_postcode}<br><span style="font-size:12px;color:#666;">${area || '—'}</span>` : '—';
     return `
     <tr onclick="window.location.href='surveyor-detail.html?id=${s.id}'" style="cursor:pointer">
