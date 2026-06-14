@@ -462,7 +462,7 @@ async function submitDetails() {
         report_addressee_name: reportAddresseeName,
         report_addressee_address: reportAddresseeAddress,
         client_site_access: document.getElementById('siteAccessNotes').value.trim() || null,
-        survey_boundary_polygon: polygonCoordinates.length > 0 ? JSON.stringify(polygonCoordinates) : null,
+        site_boundary_polygon: polygonCoordinates.length > 0 ? JSON.stringify(polygonCoordinates) : null,
         status: 'accepted',
         accepted_at: new Date().toISOString()
       })
