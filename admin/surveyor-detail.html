@@ -49,7 +49,7 @@ async function init() {
 async function loadSurveyor() {
   try {
     const [sData, jData] = await Promise.all([
-      dbGet('surveyors', { 'id': `eq.${surveyorId}`, 'limit': 1 }),
+      dbGet('surveyors', { 'id': `eq.${surveyorId}`, 'limit': 1, 'select': '*' }),
       dbGet('jobs', {
         'surveyor_id': `eq.${surveyorId}`,
         'select': 'id,reference,survey_type,urgency_state,dispatch_state,survey_date,agreed_amount,surveyor_pay_amount',
@@ -102,9 +102,14 @@ function insuranceRow(label, policyNum, expiryDate) {
 // ============================================================
 
 function renderView() {
-  const activeLabel = surveyor.is_active
-    ? `<span class="badge badge-accepted">✅ Active</span>`
-    : `<span class="badge badge-low">⏸ Paused</span>`;
+  let statusLabel = '';
+  if (surveyor.status === 'pending') {
+    statusLabel = `<span class="badge badge-elevated">⏳ Pending Approval</span>`;
+  } else if (surveyor.status === 'active') {
+    statusLabel = `<span class="badge badge-accepted">✅ Active</span>`;
+  } else {
+    statusLabel = `<span class="badge badge-low">⏸ Paused</span>`;
+  }
 
   const jobRows = surveyorJobs.length === 0
     ? ''
@@ -124,7 +129,7 @@ function renderView() {
         <div class="detail-ref">${surveyor.full_name || '—'}</div>
         <div class="detail-sub">${surveyor.email || ''}</div>
       </div>
-      <div style="margin-left:auto;">${activeLabel}</div>
+      <div style="margin-left:auto;">${statusLabel}</div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;">
@@ -206,9 +211,12 @@ function renderView() {
             ${surveyor.email ? `<a href="mailto:${surveyor.email}" class="btn btn-secondary w-100" style="justify-content:center;">📧 Email Surveyor</a>` : ''}
             ${surveyor.phone ? `<a href="tel:${surveyor.phone}" class="btn btn-secondary w-100" style="justify-content:center;">📞 Call Surveyor</a>` : ''}
             <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="renderEdit()">✏️ Edit Details</button>
-            <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="toggleActive()">
-              ${surveyor.is_active ? '⏸ Pause Account' : '✅ Reactivate Account'}
-            </button>
+            ${surveyor.status === 'pending'
+              ? `<button class="btn btn-primary w-100" style="justify-content:center;" onclick="approveSurveyor()">✅ Approve & Activate</button>`
+              : `<button class="btn btn-secondary w-100" style="justify-content:center;" onclick="toggleActive()">
+                  ${surveyor.status === 'active' ? '⏸ Pause Account' : '✅ Reactivate Account'}
+                </button>`
+            }
           </div>
         </div>
 
@@ -452,11 +460,38 @@ async function unlinkUserId() {
 }
 
 async function toggleActive() {
-  const newState = !surveyor.is_active;
+  const newState = surveyor.status === 'active' ? 'paused' : 'active';
   try {
-    await dbUpdate('surveyors', `id=eq.${surveyorId}`, { is_active: newState });
-    surveyor.is_active = newState;
-    showToast(newState ? 'Account reactivated' : 'Account paused');
+    await dbUpdate('surveyors', `id=eq.${surveyorId}`, { status: newState, is_active: newState === 'active' });
+    surveyor.status = newState;
+    surveyor.is_active = newState === 'active';
+    showToast(newState === 'active' ? 'Account reactivated' : 'Account paused');
+    renderView();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+async function approveSurveyor() {
+  const rate = prompt('Enter surveyor\'s hourly rate (£):', '');
+  if (rate === null) return;
+
+  const hourlyRate = parseFloat(rate);
+  if (isNaN(hourlyRate) || hourlyRate <= 0) {
+    showToast('Please enter a valid hourly rate', 'error');
+    return;
+  }
+
+  try {
+    await dbUpdate('surveyors', `id=eq.${surveyorId}`, {
+      status: 'active',
+      is_active: true,
+      hourly_rate: hourlyRate
+    });
+    surveyor.status = 'active';
+    surveyor.is_active = true;
+    surveyor.hourly_rate = hourlyRate;
+    showToast('Surveyor approved and activated');
     renderView();
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
