@@ -439,10 +439,8 @@ function renderEnquiryAcceptanceDetails() {
 
   return `
     <div class="card">
-      <div class="card-title" style="cursor:pointer;" onclick="toggleEnquiryAcceptanceDetails()">
-        <span id="enquiryAcceptanceToggle">▼</span> Client & Site Details
-      </div>
-      <div id="enquiryAcceptanceContent" style="display:none;">
+      <div class="card-title">Client & Site Details</div>
+      <div id="enquiryAcceptanceContent">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
           ${enquiry.billing_contact_name ? `
             <div>
