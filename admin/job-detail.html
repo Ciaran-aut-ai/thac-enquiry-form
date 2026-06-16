@@ -128,10 +128,16 @@
 <div class="modal-overlay" id="linkedJobModal" style="display:none">
   <div class="modal">
     <div class="modal-title">Create Linked Job</div>
-    <div class="modal-sub">Link this job as a parent. A child job will be created with automatic naming.</div>
+    <div class="modal-sub">Select a parent job and create a linked child job with automatic naming.</div>
 
-    <div style="background:#f3f4f6;padding:12px;border-radius:8px;margin-bottom:16px;font-size:13px;">
-      <strong>Parent Job:</strong> <span id="linkedParentRef" style="color:var(--green-dark);font-weight:700;">—</span>
+    <div class="form-group">
+      <label>Select Parent Job <span class="req">*</span></label>
+      <input type="text" class="form-control" id="linkedParentSearch" placeholder="Search by job reference (e.g. TH 5028)..." oninput="searchParentJobs(this.value)">
+      <div id="linkedParentDropdown" style="display:none;max-height:200px;overflow-y:auto;border:1px solid #d1d5db;border-radius:8px;margin-top:4px;background:white;"></div>
+    </div>
+
+    <div style="background:#f3f4f6;padding:12px;border-radius:8px;margin-bottom:16px;font-size:13px;display:none;" id="linkedParentInfo">
+      <strong>Selected Parent:</strong> <span id="linkedParentRef" style="color:var(--green-dark);font-weight:700;">—</span>
       <br><span style="color:var(--text-muted);">Child will be named: <strong id="linkedChildRef">—</strong></span>
     </div>
 
@@ -1130,9 +1136,7 @@ function renderNDAStatus() {
 }
 
 function renderLinkedJobButton() {
-  // Only show for parent jobs (jobs without a parent_job_id)
-  if (job.parent_job_id) return '';
-
+  // Show for all jobs (parent jobs can use it naturally, child jobs can create siblings)
   return `<button class="btn btn-secondary w-100" style="justify-content:center;" onclick="openLinkedJobModal()">
     🔗 Create Linked Job
   </button>`;
@@ -1218,16 +1222,71 @@ async function submitAllocate() {
 // CREATE LINKED JOB MODAL
 // ============================================================
 
-async function openLinkedJobModal() {
-  if (!job.reference) {
-    showToast('Parent job must have a reference', 'error');
+let selectedParentJob = null;
+
+function openLinkedJobModal() {
+  selectedParentJob = null;
+  document.getElementById('linkedParentSearch').value = '';
+  document.getElementById('linkedParentDropdown').style.display = 'none';
+  document.getElementById('linkedParentInfo').style.display = 'none';
+  document.getElementById('linkedSurveyType').value = '';
+  document.getElementById('linkedNotes').value = '';
+  document.getElementById('linkedJobModal').style.display = 'flex';
+}
+
+function closeLinkedJobModal() {
+  document.getElementById('linkedJobModal').style.display = 'none';
+  selectedParentJob = null;
+}
+
+async function searchParentJobs(query) {
+  const dropdown = document.getElementById('linkedParentDropdown');
+
+  if (!query || query.length < 2) {
+    dropdown.style.display = 'none';
     return;
   }
+
+  try {
+    const results = await dbGet('jobs', {
+      'reference': `ilike.${query}%`,
+      'parent_job_id': `is.null`,
+      'select': 'id,reference,site_postcode,urgency_state',
+      'order': 'reference.desc',
+      'limit': 10
+    });
+
+    if (!results || results.length === 0) {
+      dropdown.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:13px;">No parent jobs found</div>';
+      dropdown.style.display = 'block';
+      return;
+    }
+
+    const html = results.map(j => `
+      <div style="padding:10px 12px;border-bottom:1px solid #e5e7eb;cursor:pointer;display:flex;justify-content:space-between;align-items:center;hover:background:#f3f4f6;"
+           onmouseover="this.style.background='#f3f4f6'"
+           onmouseout="this.style.background='white'"
+           onclick="selectParentJob('${j.id}', '${j.reference}', '${j.urgency_state}', '${j.site_postcode}')">
+        <strong style="color:var(--green-dark);">${j.reference}</strong>
+        <span style="font-size:11px;color:var(--text-muted);">${j.site_postcode}</span>
+      </div>
+    `).join('');
+
+    dropdown.innerHTML = html;
+    dropdown.style.display = 'block';
+  } catch (e) {
+    dropdown.innerHTML = '<div style="padding:12px;color:#dc2626;font-size:13px;">Error: ' + e.message + '</div>';
+    dropdown.style.display = 'block';
+  }
+}
+
+async function selectParentJob(parentId, parentRef, urgencyState, postcode) {
+  selectedParentJob = { id: parentId, reference: parentRef, urgency_state: urgencyState, site_postcode: postcode };
 
   // Calculate next child reference
   try {
     const children = await dbGet('jobs', {
-      'parent_job_id': `eq.${jobId}`,
+      'parent_job_id': `eq.${parentId}`,
       'select': 'reference',
       'order': 'created_at.desc'
     });
@@ -1241,22 +1300,23 @@ async function openLinkedJobModal() {
       }
     }
 
-    const childRef = `${job.reference}-${nextNumber}`;
-    document.getElementById('linkedParentRef').textContent = job.reference;
+    const childRef = `${parentRef}-${nextNumber}`;
+    document.getElementById('linkedParentRef').textContent = parentRef;
     document.getElementById('linkedChildRef').textContent = childRef;
-    document.getElementById('linkedJobModal').style.display = 'flex';
+    document.getElementById('linkedParentInfo').style.display = 'block';
+    document.getElementById('linkedParentSearch').value = parentRef;
+    document.getElementById('linkedParentDropdown').style.display = 'none';
   } catch (e) {
     showToast('Error calculating child reference: ' + e.message, 'error');
   }
 }
 
-function closeLinkedJobModal() {
-  document.getElementById('linkedJobModal').style.display = 'none';
-  document.getElementById('linkedSurveyType').value = '';
-  document.getElementById('linkedNotes').value = '';
-}
-
 async function submitLinkedJob() {
+  if (!selectedParentJob) {
+    showToast('Please select a parent job', 'error');
+    return;
+  }
+
   const surveyType = document.getElementById('linkedSurveyType').value;
   const dispatchState = document.getElementById('linkedDispatchState').value;
   const notes = document.getElementById('linkedNotes').value.trim();
@@ -1269,7 +1329,7 @@ async function submitLinkedJob() {
   try {
     // Calculate child reference
     const children = await dbGet('jobs', {
-      'parent_job_id': `eq.${jobId}`,
+      'parent_job_id': `eq.${selectedParentJob.id}`,
       'select': 'reference'
     });
 
@@ -1282,11 +1342,11 @@ async function submitLinkedJob() {
       }
     }
 
-    const childRef = `${job.reference}-${nextNumber}`;
+    const childRef = `${selectedParentJob.reference}-${nextNumber}`;
 
     // Create linked job
     const slaMap = { '1day': 1, '3days': 3, '5days': 5, '10days': 10 };
-    const days = slaMap[job.urgency_state] || 5;
+    const days = slaMap[selectedParentJob.urgency_state] || 5;
     let count = 0, slaDate = new Date();
     while (count < days) {
       slaDate.setDate(slaDate.getDate() + 1);
@@ -1295,18 +1355,18 @@ async function submitLinkedJob() {
 
     const linkedJobData = await dbInsert('jobs', {
       reference: childRef,
-      parent_job_id: jobId,
+      parent_job_id: selectedParentJob.id,
       survey_type: surveyType,
-      site_postcode: job.site_postcode,
-      urgency_state: job.urgency_state,
+      site_postcode: selectedParentJob.site_postcode,
+      urgency_state: selectedParentJob.urgency_state,
       dispatch_state: dispatchState,
-      billing_mode: job.billing_mode,
-      quoted_amount: job.quoted_amount,
-      agreed_amount: job.agreed_amount,
+      billing_mode: 'single',
+      quoted_amount: null,
+      agreed_amount: null,
       is_two_stage: false,
-      arranging_client_id: job.arranging_client_id,
+      arranging_client_id: null,
       sla_deadline: slaDate.toISOString().slice(0, 10),
-      internal_notes: notes || `Linked to parent job ${job.reference}`
+      internal_notes: notes || `Linked to parent job ${selectedParentJob.reference}`
     });
 
     const linkedJobId = linkedJobData[0].id;
