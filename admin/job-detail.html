@@ -124,58 +124,47 @@
   </div>
 </div>
 
-<!-- Create Linked Job Modal -->
-<div class="modal-overlay" id="linkedJobModal" style="display:none">
+<!-- Link Jobs Modal -->
+<div class="modal-overlay" id="linkJobsModal" style="display:none">
   <div class="modal">
-    <div class="modal-title">Create Linked Job</div>
-    <div class="modal-sub">Select a parent job and create a linked child job with automatic naming.</div>
+    <div class="modal-title">Link Two Jobs</div>
+    <div class="modal-sub">Link two existing jobs together - designate one as parent and one as child.</div>
 
     <div class="form-group">
-      <label>Select Parent Job <span class="req">*</span></label>
-      <input type="text" class="form-control" id="linkedParentSearch" placeholder="Search by job reference (e.g. TH 5028)..." oninput="searchParentJobs(this.value)">
-      <div id="linkedParentDropdown" style="display:none;max-height:200px;overflow-y:auto;border:1px solid #d1d5db;border-radius:8px;margin-top:4px;background:white;"></div>
+      <label>Current Job (This Job)</label>
+      <div style="padding:12px;background:#f3f4f6;border-radius:8px;font-weight:600;color:var(--green-dark);">
+        <span id="currentJobRef">—</span>
+      </div>
     </div>
 
-    <div style="background:#f3f4f6;padding:12px;border-radius:8px;margin-bottom:16px;font-size:13px;display:none;" id="linkedParentInfo">
-      <strong>Selected Parent:</strong> <span id="linkedParentRef" style="color:var(--green-dark);font-weight:700;">—</span>
-      <br><span style="color:var(--text-muted);">Child will be named: <strong id="linkedChildRef">—</strong></span>
+    <div style="text-align:center;margin:12px 0;font-size:12px;color:var(--text-muted);">
+      <strong>Link as:</strong>
     </div>
 
-    <div class="form-group">
-      <label>Survey Type <span class="req">*</span></label>
-      <select class="form-control" id="linkedSurveyType">
-        <option value="">— Choose survey type —</option>
-        <option value="bs5837">BS5837 Tree Survey (Planning)</option>
-        <option value="vta">Visual Tree Assessment (VTA)</option>
-        <option value="bc">BS5837 Stage 2 (AIA/AMS/TPP)</option>
-        <option value="subs">Subsidence / Building Damage</option>
-        <option value="ams">Arboricultural Method Statement</option>
-        <option value="tpp">Tree Protection Plan</option>
-        <option value="tpo">TPO Application</option>
-        <option value="lscp">Landscaping Plans</option>
-        <option value="mortgage">Mortgage / Insurer Report</option>
-        <option value="supervision">Site Supervision</option>
-        <option value="other">Other</option>
-      </select>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button type="button" class="btn w-100" id="linkAsParentBtn" onclick="setLinkMode('parent')"
+        style="justify-content:center;background:var(--green-dark);color:white;">
+        📌 Parent
+      </button>
+      <button type="button" class="btn w-100" id="linkAsChildBtn" onclick="setLinkMode('child')"
+        style="justify-content:center;background:#e5e7eb;color:var(--text-muted);">
+        📎 Child
+      </button>
     </div>
 
     <div class="form-group">
-      <label>Dispatch State <span class="req">*</span></label>
-      <select class="form-control" id="linkedDispatchState">
-        <option value="waiting_for_plans">🕐 Waiting for Plans</option>
-        <option value="red">🔴 Unallocated</option>
-        <option value="pending_approval">⏳ Pending Approval</option>
-      </select>
+      <label id="otherJobLabel">Select Child Job <span class="req">*</span></label>
+      <input type="text" class="form-control" id="linkJobSearch" placeholder="Search by job reference (e.g. TH 5028)..." oninput="searchLinkJobs(this.value)">
+      <div id="linkJobDropdown" style="display:none;max-height:200px;overflow-y:auto;border:1px solid #d1d5db;border-radius:8px;margin-top:4px;background:white;z-index:10;"></div>
     </div>
 
-    <div class="form-group">
-      <label>Internal Notes</label>
-      <textarea class="form-control" id="linkedNotes" rows="2" placeholder="e.g. Awaiting revised plans from architect..."></textarea>
+    <div style="background:#f3f4f6;padding:12px;border-radius:8px;margin-bottom:16px;font-size:13px;display:none;" id="linkJobInfo">
+      <strong id="linkJobInfoText">—</strong>
     </div>
 
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeLinkedJobModal()" style="flex:1;justify-content:center;">Cancel</button>
-      <button class="btn btn-primary" onclick="submitLinkedJob()" style="flex:2;justify-content:center;">✅ Create Linked Job</button>
+      <button class="btn btn-secondary" onclick="closeLinkJobsModal()" style="flex:1;justify-content:center;">Cancel</button>
+      <button class="btn btn-primary" onclick="submitLinkJobs()" style="flex:2;justify-content:center;">✅ Link Jobs</button>
     </div>
   </div>
 </div>
@@ -1136,9 +1125,8 @@ function renderNDAStatus() {
 }
 
 function renderLinkedJobButton() {
-  // Show for all jobs (parent jobs can use it naturally, child jobs can create siblings)
-  return `<button class="btn btn-secondary w-100" style="justify-content:center;" onclick="openLinkedJobModal()">
-    🔗 Create Linked Job
+  return `<button class="btn btn-secondary w-100" style="justify-content:center;" onclick="openLinkJobsModal()">
+    🔗 Link to Another Job
   </button>`;
 }
 
@@ -1219,28 +1207,56 @@ async function submitAllocate() {
 }
 
 // ============================================================
-// CREATE LINKED JOB MODAL
+// LINK JOBS MODAL
 // ============================================================
 
-let selectedParentJob = null;
+let linkMode = 'parent'; // 'parent' or 'child'
+let selectedOtherJob = null;
 
-function openLinkedJobModal() {
-  selectedParentJob = null;
-  document.getElementById('linkedParentSearch').value = '';
-  document.getElementById('linkedParentDropdown').style.display = 'none';
-  document.getElementById('linkedParentInfo').style.display = 'none';
-  document.getElementById('linkedSurveyType').value = '';
-  document.getElementById('linkedNotes').value = '';
-  document.getElementById('linkedJobModal').style.display = 'flex';
+function openLinkJobsModal() {
+  linkMode = 'parent';
+  selectedOtherJob = null;
+  document.getElementById('currentJobRef').textContent = job.reference || '—';
+  document.getElementById('linkJobSearch').value = '';
+  document.getElementById('linkJobDropdown').style.display = 'none';
+  document.getElementById('linkJobInfo').style.display = 'none';
+  setLinkMode('parent');
+  document.getElementById('linkJobsModal').style.display = 'flex';
 }
 
-function closeLinkedJobModal() {
-  document.getElementById('linkedJobModal').style.display = 'none';
-  selectedParentJob = null;
+function closeLinkJobsModal() {
+  document.getElementById('linkJobsModal').style.display = 'none';
+  selectedOtherJob = null;
 }
 
-async function searchParentJobs(query) {
-  const dropdown = document.getElementById('linkedParentDropdown');
+function setLinkMode(mode) {
+  linkMode = mode;
+  const parentBtn = document.getElementById('linkAsParentBtn');
+  const childBtn = document.getElementById('linkAsChildBtn');
+  const label = document.getElementById('otherJobLabel');
+
+  if (mode === 'parent') {
+    parentBtn.style.background = 'var(--green-dark)';
+    parentBtn.style.color = 'white';
+    childBtn.style.background = '#e5e7eb';
+    childBtn.style.color = 'var(--text-muted)';
+    label.textContent = 'Select Child Job';
+  } else {
+    parentBtn.style.background = '#e5e7eb';
+    parentBtn.style.color = 'var(--text-muted)';
+    childBtn.style.background = 'var(--green-dark)';
+    childBtn.style.color = 'white';
+    label.textContent = 'Select Parent Job';
+  }
+
+  document.getElementById('linkJobSearch').value = '';
+  document.getElementById('linkJobDropdown').style.display = 'none';
+  document.getElementById('linkJobInfo').style.display = 'none';
+  selectedOtherJob = null;
+}
+
+async function searchLinkJobs(query) {
+  const dropdown = document.getElementById('linkJobDropdown');
 
   if (!query || query.length < 2) {
     dropdown.style.display = 'none';
@@ -1250,23 +1266,23 @@ async function searchParentJobs(query) {
   try {
     const results = await dbGet('jobs', {
       'reference': `ilike.${query}%`,
-      'parent_job_id': `is.null`,
-      'select': 'id,reference,site_postcode,urgency_state',
+      'id': `neq.${jobId}`,
+      'select': 'id,reference,site_postcode',
       'order': 'reference.desc',
       'limit': 10
     });
 
     if (!results || results.length === 0) {
-      dropdown.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:13px;">No parent jobs found</div>';
+      dropdown.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:13px;">No jobs found</div>';
       dropdown.style.display = 'block';
       return;
     }
 
     const html = results.map(j => `
-      <div style="padding:10px 12px;border-bottom:1px solid #e5e7eb;cursor:pointer;display:flex;justify-content:space-between;align-items:center;hover:background:#f3f4f6;"
+      <div style="padding:10px 12px;border-bottom:1px solid #e5e7eb;cursor:pointer;display:flex;justify-content:space-between;align-items:center;"
            onmouseover="this.style.background='#f3f4f6'"
            onmouseout="this.style.background='white'"
-           onclick="selectParentJob('${j.id}', '${j.reference}', '${j.urgency_state}', '${j.site_postcode}')">
+           onclick="selectLinkJob('${j.id}', '${j.reference}')">
         <strong style="color:var(--green-dark);">${j.reference}</strong>
         <span style="font-size:11px;color:var(--text-muted);">${j.site_postcode}</span>
       </div>
@@ -1280,102 +1296,34 @@ async function searchParentJobs(query) {
   }
 }
 
-async function selectParentJob(parentId, parentRef, urgencyState, postcode) {
-  selectedParentJob = { id: parentId, reference: parentRef, urgency_state: urgencyState, site_postcode: postcode };
+function selectLinkJob(otherId, otherRef) {
+  selectedOtherJob = { id: otherId, reference: otherRef };
+  document.getElementById('linkJobSearch').value = otherRef;
+  document.getElementById('linkJobDropdown').style.display = 'none';
 
-  // Calculate next child reference
-  try {
-    const children = await dbGet('jobs', {
-      'parent_job_id': `eq.${parentId}`,
-      'select': 'reference',
-      'order': 'created_at.desc'
-    });
+  const infoText = linkMode === 'parent'
+    ? `This job (${job.reference}) will be the <strong>parent</strong><br>Selected job (${otherRef}) will be the <strong>child</strong>`
+    : `This job (${job.reference}) will be the <strong>child</strong><br>Selected job (${otherRef}) will be the <strong>parent</strong>`;
 
-    let nextNumber = 1;
-    if (children && children.length > 0) {
-      const lastRef = children[0].reference;
-      const match = lastRef.match(/-(\d+)$/);
-      if (match) {
-        nextNumber = parseInt(match[1]) + 1;
-      }
-    }
-
-    const childRef = `${parentRef}-${nextNumber}`;
-    document.getElementById('linkedParentRef').textContent = parentRef;
-    document.getElementById('linkedChildRef').textContent = childRef;
-    document.getElementById('linkedParentInfo').style.display = 'block';
-    document.getElementById('linkedParentSearch').value = parentRef;
-    document.getElementById('linkedParentDropdown').style.display = 'none';
-  } catch (e) {
-    showToast('Error calculating child reference: ' + e.message, 'error');
-  }
+  document.getElementById('linkJobInfoText').innerHTML = infoText;
+  document.getElementById('linkJobInfo').style.display = 'block';
 }
 
-async function submitLinkedJob() {
-  if (!selectedParentJob) {
-    showToast('Please select a parent job', 'error');
-    return;
-  }
-
-  const surveyType = document.getElementById('linkedSurveyType').value;
-  const dispatchState = document.getElementById('linkedDispatchState').value;
-  const notes = document.getElementById('linkedNotes').value.trim();
-
-  if (!surveyType) {
-    showToast('Please select a survey type', 'error');
+async function submitLinkJobs() {
+  if (!selectedOtherJob) {
+    showToast('Please select a job to link', 'error');
     return;
   }
 
   try {
-    // Calculate child reference
-    const children = await dbGet('jobs', {
-      'parent_job_id': `eq.${selectedParentJob.id}`,
-      'select': 'reference'
-    });
+    const parentId = linkMode === 'parent' ? jobId : selectedOtherJob.id;
+    const childId = linkMode === 'parent' ? selectedOtherJob.id : jobId;
 
-    let nextNumber = 1;
-    if (children && children.length > 0) {
-      const lastRef = children[children.length - 1].reference;
-      const match = lastRef.match(/-(\d+)$/);
-      if (match) {
-        nextNumber = parseInt(match[1]) + 1;
-      }
-    }
+    await dbUpdate('jobs', `id=eq.${childId}`, { parent_job_id: parentId });
 
-    const childRef = `${selectedParentJob.reference}-${nextNumber}`;
-
-    // Create linked job
-    const slaMap = { '1day': 1, '3days': 3, '5days': 5, '10days': 10 };
-    const days = slaMap[selectedParentJob.urgency_state] || 5;
-    let count = 0, slaDate = new Date();
-    while (count < days) {
-      slaDate.setDate(slaDate.getDate() + 1);
-      if (slaDate.getDay() !== 0 && slaDate.getDay() !== 6) count++;
-    }
-
-    const linkedJobData = await dbInsert('jobs', {
-      reference: childRef,
-      parent_job_id: selectedParentJob.id,
-      survey_type: surveyType,
-      site_postcode: selectedParentJob.site_postcode,
-      urgency_state: selectedParentJob.urgency_state,
-      dispatch_state: dispatchState,
-      billing_mode: 'single',
-      quoted_amount: null,
-      agreed_amount: null,
-      is_two_stage: false,
-      arranging_client_id: null,
-      sla_deadline: slaDate.toISOString().slice(0, 10),
-      internal_notes: notes || `Linked to parent job ${selectedParentJob.reference}`
-    });
-
-    const linkedJobId = linkedJobData[0].id;
-    closeLinkedJobModal();
-    showToast(`✅ Linked job created: ${childRef}`);
-
-    setTimeout(() => {
-      window.location.href = `job-detail.html?id=${linkedJobId}`;
-    }, 1500);
+    closeLinkJobsModal();
+    showToast('✅ Jobs linked successfully');
+    renderJob();
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
   }
