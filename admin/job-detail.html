@@ -1360,7 +1360,9 @@ function renderTwoStageActions() {
 async function createStage2() {
   if (!confirm('Create a Stage 2 job linked to this one? It will start in "Waiting for Plans" status.')) return;
   try {
+    const stage2Reference = job.reference ? `${job.reference}-1` : null;
     const result = await dbInsert('jobs', {
+      reference:         stage2Reference,
       parent_job_id:     jobId,
       survey_type:       job.survey_type,
       site_postcode:     job.site_postcode,
@@ -1772,7 +1774,9 @@ async function createStage2Job() {
     const daysMap = { '1day': 1, '3days': 3, '5days': 5, '10days': 10 };
     slaDeadline.setDate(slaDeadline.getDate() + daysMap[deadline]);
 
+    const stage2Reference = job.reference ? `${job.reference}-1` : null;
     const stage2Data = await dbInsert('jobs', {
+      reference: stage2Reference,
       parent_job_id: jobId,
       survey_type: surveyType,
       job_type: 'new',
