@@ -838,6 +838,39 @@ function renderJob() {
           </div>
         </div>
 
+        <!-- Invoicing Configuration -->
+        <div class="card">
+          <div class="card-title">Invoicing Configuration</div>
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;">
+            <div style="padding:10px;background:var(--amber-light);border-radius:8px;line-height:1.5;">
+              <strong>Current Method:</strong> ${job.invoicing_method === 'split' ? '50/50 Split on Survey Fee' : 'Single Invoice'}
+              <br><span style="font-size:12px;color:var(--text-muted);">${job.invoicing_method === 'split'
+                ? 'Invoice 1: Surveyor cost + ½ survey fee + urgency fee. Invoice 2: ½ survey fee (only if report generated)'
+                : 'Single invoice: Full job cost in one payment'}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex:1;margin:0;font-weight:400;">
+                <input type="checkbox" id="reportGeneratedCheckbox" ${job.report_generated ? 'checked' : ''}
+                  onchange="updateReportGenerated(this.checked)">
+                Survey report generated
+              </label>
+              <span style="font-size:11px;color:var(--text-muted);">Determines if 2nd invoice is issued</span>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-secondary w-100" onclick="changeInvoicingMethod('split')"
+                ${job.invoicing_method === 'split' ? 'disabled style="opacity:0.5;"' : ''}
+                style="justify-content:center;">
+                50/50 Split
+              </button>
+              <button class="btn btn-secondary w-100" onclick="changeInvoicingMethod('single')"
+                ${job.invoicing_method === 'single' ? 'disabled style="opacity:0.5;"' : ''}
+                style="justify-content:center;">
+                Single Invoice
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Record Info -->
         <div class="card">
           <div class="card-title">Record Info</div>
@@ -1260,6 +1293,30 @@ async function toggleTwoStage(checked) {
     await dbUpdate('jobs', `id=eq.${jobId}`, { is_two_stage: checked });
     job.is_two_stage = checked;
     showToast(checked ? 'Marked as two-stage BS5837 job' : 'Removed two-stage flag');
+    renderJob();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+async function changeInvoicingMethod(method) {
+  if (job.invoicing_method === method) return;
+  try {
+    await dbUpdate('jobs', `id=eq.${jobId}`, { invoicing_method: method });
+    job.invoicing_method = method;
+    const methodName = method === 'split' ? '50/50 Split invoicing' : 'Single Invoice';
+    showToast(`Changed to ${methodName}`);
+    renderJob();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+async function updateReportGenerated(checked) {
+  try {
+    await dbUpdate('jobs', `id=eq.${jobId}`, { report_generated: checked });
+    job.report_generated = checked;
+    showToast(checked ? 'Report marked as generated' : 'Report generation unmarked');
     renderJob();
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
