@@ -49,7 +49,7 @@ async function init() {
 async function loadSurveyor() {
   try {
     const [sData, jData] = await Promise.all([
-      dbGet('surveyors', { 'id': `eq.${surveyorId}`, 'limit': 1, 'select': '*' }),
+      dbGet('surveyors', { 'id': `eq.${surveyorId}`, 'limit': 1, 'select': 'id,user_id,hourly_rate,home_postcode,home_lat,home_lng,radius_miles,pi_policy_number,pi_expiry_date,pl_policy_number,pl_expiry_date,dbs_number,dbs_expiry_date,qualifications,is_paused,created_at,full_name,email,phone,notes,is_active,status' }),
       dbGet('jobs', {
         'surveyor_id': `eq.${surveyorId}`,
         'select': 'id,reference,survey_type,urgency_state,dispatch_state,survey_date,agreed_amount,surveyor_pay_amount',
@@ -176,20 +176,14 @@ function renderView() {
           </div>
         </div>
 
-        ${surveyor.memberships || surveyor.qualifications ? `
+        ${surveyor.qualifications ? `
         <div class="card">
           <div class="card-title">Qualifications</div>
           <div class="detail-grid">
-            ${surveyor.memberships ? `
-            <div class="detail-field" style="grid-column:1/-1">
-              <label>Professional Memberships</label>
-              <div class="field-value">${surveyor.memberships}</div>
-            </div>` : ''}
-            ${surveyor.qualifications ? `
             <div class="detail-field" style="grid-column:1/-1">
               <label>Qualifications</label>
               <div class="field-value">${surveyor.qualifications}</div>
-            </div>` : ''}
+            </div>
           </div>
         </div>` : ''}
 
@@ -355,10 +349,6 @@ function renderEdit() {
         <div class="card">
           <div class="card-title">Qualifications</div>
           <div class="form-group">
-            <label>Professional Memberships</label>
-            <input type="text" class="form-control" id="eMemberships" value="${esc(surveyor.memberships)}" placeholder="e.g. AA, ICFor">
-          </div>
-          <div class="form-group">
             <label>Qualifications</label>
             <textarea class="form-control" id="eQuals" rows="3" placeholder="Qualifications and certifications...">${esc(surveyor.qualifications)}</textarea>
           </div>
@@ -411,7 +401,6 @@ async function saveSurveyor() {
     pl_expiry_date:           document.getElementById('ePlExp').value              || null,
     dbs_number:               document.getElementById('eDbsNum').value.trim()      || null,
     dbs_expiry_date:          document.getElementById('eDbsExp').value             || null,
-    memberships:              document.getElementById('eMemberships').value.trim() || null,
     qualifications:           document.getElementById('eQuals').value.trim()       || null,
     notes:                    document.getElementById('eNotes').value.trim()       || null,
   };
