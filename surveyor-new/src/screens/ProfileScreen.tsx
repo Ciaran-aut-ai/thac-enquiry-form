@@ -103,7 +103,7 @@ export default function ProfileScreen() {
         <Text style={s.email}>{surveyor.email}</Text>
         {surveyor.phone ? <Text style={s.detail}>{surveyor.phone}</Text> : null}
         {surveyor.home_postcode ? <Text style={s.detail}>📍 {surveyor.home_postcode} · {surveyor.radius_miles} mile radius</Text> : null}
-        {surveyor.hourly_rate ? <Text style={s.detail}>£{surveyor.hourly_rate}/hr</Text> : null}
+        {surveyor.hourly_rate ? <Text style={s.detail}>£{surveyor.hourly_rate}/hr <Text style={{fontSize: 12, color: '#999'}}>(set by admin)</Text></Text> : null}
       </View>
 
       <View style={s.card}>

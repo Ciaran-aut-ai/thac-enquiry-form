@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
-import { supabase } from '../supabase';
+import { supabase } from '../lib/supabase';
 
 const styles = StyleSheet.create({
   container: {
