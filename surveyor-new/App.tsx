@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Session } from '@supabase/supabase-js';
+import { ActivityIndicator, View, Text } from 'react-native';
 
 import { supabase } from './src/lib/supabase';
 import { RootStackParamList, BottomTabParamList } from './src/types';
@@ -12,7 +13,6 @@ import { RootStackParamList, BottomTabParamList } from './src/types';
 import LoginScreen           from './src/screens/LoginScreen';
 import { RegisterScreen }   from './src/screens/RegisterScreen';
 import { PendingApprovalScreen } from './src/screens/PendingApprovalScreen';
-import JobMapScreen         from './src/screens/JobMapScreen';
 import JobListScreen        from './src/screens/JobListScreen';
 import JobDetailScreen      from './src/screens/JobDetailScreen';
 import ProfileScreen        from './src/screens/ProfileScreen';
@@ -33,7 +33,6 @@ function MainTabs() {
         tabBarActiveTintColor: GREEN,
         tabBarIcon: ({ color, size }) => {
           const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
-            Map:     'map',
             Jobs:    'list',
             TimeOff: 'calendar',
             Profile: 'person',
@@ -42,7 +41,6 @@ function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Map"     component={JobMapScreen}  options={{ title: 'Job Map' }} />
       <Tab.Screen name="Jobs"    component={JobListScreen} options={{ title: 'Jobs' }} />
       <Tab.Screen name="TimeOff" component={TimeOffScreen} options={{ title: 'Time Off' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
@@ -56,42 +54,89 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
+    let mounted = true;
+    let timeout: any;
 
-      if (session?.user?.id) {
-        const { data: surveyor } = await supabase
-          .from('surveyors')
-          .select('status')
-          .eq('user_id', session.user.id)
-          .single();
+    const initAuth = async () => {
+      timeout = setTimeout(() => {
+        if (mounted) {
+          console.log('Session check timeout');
+          setLoading(false);
+        }
+      }, 5000);
 
-        setSurveyorStatus(surveyor?.status as 'pending' | 'active' | null);
+      try {
+        console.log('Getting session...');
+        const result = await supabase.auth.getSession();
+        console.log('Session result:', result);
+        if (mounted) {
+          const { data: { session }, error } = result;
+          if (error) {
+            console.error('Session error object:', error);
+          }
+          console.log('Setting session:', session ? 'logged in' : 'not logged in');
+          setSession(session || null);
+        }
+      } catch (err) {
+        console.error('Session exception:', err);
+      } finally {
+        if (mounted) {
+          clearTimeout(timeout);
+          setLoading(false);
+        }
       }
+    };
 
-      setLoading(false);
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) {
+        setSession(session || null);
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-
-      if (session?.user?.id) {
-        const { data: surveyor } = await supabase
-          .from('surveyors')
-          .select('status')
-          .eq('user_id', session.user.id)
-          .single();
-
-        setSurveyorStatus(surveyor?.status as 'pending' | 'active' | null);
-      } else {
-        setSurveyorStatus(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
-  if (loading) return null;
+  useEffect(() => {
+    if (!session) {
+      setSurveyorStatus(null);
+      return;
+    }
+
+    const fetchSurveyorStatus = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('surveyors')
+          .select('status')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (error) {
+          console.log('No surveyor profile found:', error.message);
+          setSurveyorStatus(null);
+          return;
+        }
+
+        setSurveyorStatus(data?.status as 'pending' | 'active');
+      } catch (err) {
+        console.error('Error fetching surveyor status:', err);
+        setSurveyorStatus(null);
+      }
+    };
+
+    fetchSurveyorStatus();
+  }, [session]);
+
+  if (loading) return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+      <ActivityIndicator size="large" color="#1a3c2e" />
+    </View>
+  );
 
   return (
     <NavigationContainer>
@@ -102,16 +147,16 @@ export default function App() {
           headerTitleStyle: { fontWeight: '700' },
         }}
       >
-        {session
-          ? surveyorStatus === 'pending'
-            ? <Stack.Screen name="PendingApproval" component={PendingApprovalScreen} options={{ headerShown: false }} />
-            : surveyorStatus === 'active'
-            ? <>
-                <Stack.Screen name="Main"      component={MainTabs}       options={{ headerShown: false }} />
-                <Stack.Screen name="JobDetail" component={JobDetailScreen} options={{ title: 'Job Detail' }} />
-              </>
-            : <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
-          : <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+        {!session
+          ? <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+          : surveyorStatus === 'pending'
+          ? <Stack.Screen name="PendingApproval" component={PendingApprovalScreen} options={{ headerShown: false }} />
+          : surveyorStatus === 'active'
+          ? <>
+              <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+              <Stack.Screen name="JobDetail" component={JobDetailScreen} options={{ title: 'Job Detail' }} />
+            </>
+          : <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
         }
       </Stack.Navigator>
     </NavigationContainer>
