@@ -1643,7 +1643,7 @@ function renderStage2Button() {
 
 function renderDispatchButton() {
   const d = job.dispatch_state;
-  if (d === 'pending_approval') {
+  if (d === 'pending_approval' || d === 'yellow') {
     return `<button class="btn btn-primary w-100" style="justify-content:center;background:var(--green-dark);" onclick="approveToMap()">
       ✅ Approve to Map
     </button>`;
