@@ -335,7 +335,10 @@ export function RegisterScreen({ navigation }: any) {
               Already have an account?{' '}
               <Text
                 style={styles.signInButton}
-                onPress={() => navigation.navigate('Login')}
+                onPress={async () => {
+                  await supabase.auth.signOut();
+                  navigation.replace('Login');
+                }}
               >
                 Sign In
               </Text>
