@@ -15,6 +15,7 @@ import { RegisterScreen }   from './src/screens/RegisterScreen';
 import { PendingApprovalScreen } from './src/screens/PendingApprovalScreen';
 import JobListScreen        from './src/screens/JobListScreen';
 import JobDetailScreen      from './src/screens/JobDetailScreen';
+import JobMapScreen         from './src/screens/JobMapScreen';
 import ProfileScreen        from './src/screens/ProfileScreen';
 import TimeOffScreen        from './src/screens/TimeOffScreen';
 
@@ -42,6 +43,7 @@ function MainTabs() {
       })}
     >
       <Tab.Screen name="Jobs"    component={JobListScreen} options={{ title: 'Jobs' }} />
+      <Tab.Screen name="Map"     component={JobMapScreen}  options={{ title: 'Map' }} />
       <Tab.Screen name="TimeOff" component={TimeOffScreen} options={{ title: 'Time Off' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
