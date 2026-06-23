@@ -395,6 +395,7 @@ function toggleEndClient(val) {
 }
 
 async function submitStep2(enquiryId, ref) {
+  console.log('🚀 submitStep2 called with enquiryId:', enquiryId, 'ref:', ref);
   const btn = document.querySelector('.btn-accept');
 
   // Validate T&C acceptance
@@ -438,9 +439,14 @@ async function submitStep2(enquiryId, ref) {
     if (parkingLat !== null && parkingLng !== null) {
       updateData.parking_lat = parkingLat;
       updateData.parking_lng = parkingLng;
+      console.log('✅ Parking data added to update:', parkingLat, parkingLng);
+    } else {
+      console.log('⚠️ No parking location - parkingLat:', parkingLat, 'parkingLng:', parkingLng);
     }
 
+    console.log('📤 Sending PATCH to enquiries with data:', updateData);
     await supabasePatch('enquiries', `id=eq.${enquiryId}`, updateData);
+    console.log('✅ Enquiries PATCH completed');
 
     // Auto-create job from accepted quote
     try {
@@ -465,8 +471,8 @@ async function submitStep2(enquiryId, ref) {
         parking_lng: parkingLng,
       };
 
-      console.log('polygonCoordinates before job creation:', polygonCoordinates);
-      console.log('Creating job with data:', jobData);
+      console.log('📤 Creating job with parking_lat:', jobData.parking_lat, 'parking_lng:', jobData.parking_lng);
+      console.log('📤 Full job data:', jobData);
 
       const jobResp = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
         method: 'POST',
