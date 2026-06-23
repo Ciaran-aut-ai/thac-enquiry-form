@@ -615,7 +615,9 @@ function initializeMap() {
 
   // Parking pin drop handler
   let parkingMarker = null;
+  console.log('Map initialized, attaching click handler');
   map.on('click', (e) => {
+    console.log('Map clicked at:', e.latlng.lat, e.latlng.lng);
     parkingLat = e.latlng.lat;
     parkingLng = e.latlng.lng;
     if (parkingMarker) {
@@ -626,8 +628,10 @@ function initializeMap() {
         const pos = parkingMarker.getLatLng();
         parkingLat = pos.lat;
         parkingLng = pos.lng;
+        console.log('Marker dragged to:', parkingLat, parkingLng);
       });
     }
+    console.log('Parking location set to:', parkingLat, parkingLng);
   });
 
   // Address search functionality
