@@ -522,6 +522,7 @@ function renderSurveyAndSiteDetails() {
   const postcode = job?.site_postcode;
   const coordinates = job?.site_lat && job?.site_lng ? `${Number(job.site_lat).toFixed(5)}, ${Number(job.site_lng).toFixed(5)}` : null;
   const hasParkingPin = enquiry?.parking_lat || job?.parking_lat;
+  console.log('🅿️ Parking check - enquiry.parking_lat:', enquiry?.parking_lat, 'job.parking_lat:', job?.parking_lat, 'hasParkingPin:', hasParkingPin);
   const hasAccessDetails = job?.site_access_notes || job?.site_location_tag;
 
   if (!surveyType && !treeCount && !address && !surveyDate && !slaDeadline && !postcode && !hasParkingPin && !hasAccessDetails) return '';
