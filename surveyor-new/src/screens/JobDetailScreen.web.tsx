@@ -19,40 +19,88 @@ const SURVEY_LABELS: Record<string, string> = {
 function ParkingLocationMap({ parkingLat, parkingLng }: { parkingLat: number; parkingLng: number }) {
   if (!parkingLat || !parkingLng) return null;
 
-  if (Platform.OS === 'web') {
-    return (
-      <View style={{ height: 320, borderRadius: 8, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: '#666', fontSize: 14 }}>Parking location map (mobile only)</Text>
-      </View>
-    );
-  }
+  return (
+    <View style={{ height: 320, borderRadius: 8, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#ddd' }}>
+      <Text style={{ color: '#666', fontSize: 14, fontWeight: '600' }}>Parking Location Map</Text>
+      <Text style={{ color: '#999', fontSize: 12, marginTop: 4 }}>(Available on mobile app)</Text>
+    </View>
+  );
 
   const MapView = require('react-native-maps').default;
-  const Marker = require('react-native-maps').Marker;
+  const Polygon = require('react-native-maps').Polygon;
+  const [mapType, setMapType] = useState<'standard' | 'satellite' | 'terrain'>('standard');
 
-  return (
-    <MapView
-      style={{ height: 320, borderRadius: 8, overflow: 'hidden' }}
-      initialRegion={{
-        latitude: parkingLat,
-        longitude: parkingLng,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }}
-      mapType="standard"
-      zoomEnabled={true}
-      scrollEnabled={true}
-      showsUserLocation={true}
-    >
-      <Marker
-        coordinate={{
-          latitude: parkingLat,
-          longitude: parkingLng,
-        }}
-        title="Parking Location"
-      />
-    </MapView>
-  );
+  try {
+    const parsed = JSON.parse(polygon);
+    let coordinates = [];
+
+    if (Array.isArray(parsed)) {
+      coordinates = parsed;
+    } else if (parsed?.coordinates?.[0]) {
+      coordinates = parsed.coordinates[0];
+    } else if (parsed?.coordinates) {
+      coordinates = parsed.coordinates;
+    }
+
+    const validCoords = coordinates.filter((c: any) =>
+      Array.isArray(c) && typeof c[0] === 'number' && typeof c[1] === 'number'
+    );
+
+    if (validCoords.length < 3) return null;
+
+    const mapCoords = validCoords.map((c: any) => ({
+      latitude: c[0],
+      longitude: c[1],
+    }));
+
+    return (
+      <View>
+        <View style={{ flexDirection: 'row', gap: 6, paddingVertical: 8, paddingHorizontal: 4 }}>
+          {['standard', 'satellite', 'terrain'].map((type) => (
+            <TouchableOpacity
+              key={type}
+              onPress={() => setMapType(type as any)}
+              style={{
+                flex: 1,
+                paddingVertical: 6,
+                paddingHorizontal: 8,
+                borderRadius: 4,
+                backgroundColor: mapType === type ? '#1a3c2e' : '#e5e7eb',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '600', color: mapType === type ? '#fff' : '#374151', textTransform: 'capitalize' }}>
+                {type}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <MapView
+          style={{ height: 320, borderRadius: 8, overflow: 'hidden' }}
+          initialRegion={{
+            latitude: jobLat,
+            longitude: jobLng,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }}
+          mapType={mapType}
+          zoomEnabled={true}
+          scrollEnabled={true}
+          showsUserLocation={true}
+        >
+          <Polygon
+            coordinates={mapCoords}
+            strokeColor="#1a3c2e"
+            strokeWidth={2}
+            fillColor="rgba(26, 60, 46, 0.15)"
+          />
+        </MapView>
+      </View>
+    );
+  } catch (e) {
+    return null;
+  }
 }
 
 export default function JobDetailScreen() {
@@ -290,11 +338,6 @@ export default function JobDetailScreen() {
 
   return (
     <ScrollView style={s.container} contentContainerStyle={{ padding: 16, gap: 12 }}>
-
-      {/* Back Button */}
-      <TouchableOpacity onPress={() => nav.goBack()} style={{ marginBottom: 8 }}>
-        <Text style={{ fontSize: 18, color: '#1a3c2e', fontWeight: '700' }}>← Back</Text>
-      </TouchableOpacity>
 
       {/* Allocated Job Alert */}
       {job.allocated_surveyor_id && !job.allocation_rejected_at && job.dispatch_state !== 'orange' && (
