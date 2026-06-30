@@ -762,36 +762,10 @@
       </div>
 
       <div class="field-group">
-        <label>Site Address — Street <span class="required">*</span></label>
-        <input type="text" id="siteStreet" placeholder="e.g. 123 Oak Lane">
-        <div class="field-hint">The street address of the property where the trees are located.</div>
-        <div class="field-error" id="siteStreetError">Please enter the street address.</div>
-      </div>
-
-      <div class="field-group">
-        <label>Site Address — City/Town <span class="required">*</span></label>
-        <input type="text" id="siteCity" placeholder="e.g. London">
-        <div class="field-hint">The city or town where the property is located.</div>
-        <div class="field-error" id="siteCityError">Please enter the city or town.</div>
-      </div>
-
-      <div class="field-group">
         <label>Site Postcode <span class="required">*</span></label>
         <input type="text" id="sitePostcode" placeholder="e.g. SW1A 1AA" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
         <div class="field-hint">The postcode of the property where the trees are located.</div>
         <div class="field-error" id="sitePostcodeError">Please enter a valid postcode.</div>
-      </div>
-
-      <div class="field-group">
-        <label>Required Deadline <span class="required">*</span></label>
-        <select id="deadline" onchange="updateQuotePreview()">
-          <option value="">Select deadline...</option>
-          <option value="1day">Within 1 working day (+£150 surcharge)</option>
-          <option value="3days">Within 3 working days (+£50 surcharge)</option>
-          <option value="5days">Within 5 working days (standard rate)</option>
-          <option value="10days">Within 10 working days / No urgency (standard rate)</option>
-        </select>
-        <div class="field-error" id="deadlineError">Please select a deadline.</div>
       </div>
 
       <div class="form-nav">
@@ -804,6 +778,19 @@
     <div class="step-panel" id="step-3-new">
       <div class="card-title">Your Estimated Quote</div>
       <div class="card-subtitle">Based on what you've told us. Prices shown exclude VAT.</div>
+
+      <div class="field-group">
+        <label>Required Deadline <span class="required">*</span></label>
+        <select id="deadline" onchange="updateDeadlineSurcharge()">
+          <option value="">Select deadline...</option>
+          <option value="1day">Within 1 working day (+£150 surcharge)</option>
+          <option value="3days">Within 3 working days (+£50 surcharge)</option>
+          <option value="5days">Within 5 working days (standard rate)</option>
+          <option value="10days">Within 10 working days / No urgency (standard rate)</option>
+        </select>
+        <div class="field-hint">Select when you need the work completed — this affects the price below.</div>
+        <div class="field-error" id="deadlineError">Please select a deadline.</div>
+      </div>
 
       <!-- Standard quote -->
       <div id="standardQuote">
@@ -836,7 +823,7 @@
 
       <div class="form-nav">
         <button class="btn btn-secondary" onclick="goTo('step-2-new')">← Back</button>
-        <button class="btn btn-primary" onclick="goTo('step-4-new')">Continue →</button>
+        <button class="btn btn-primary" onclick="proceedFromQuote()">Continue →</button>
       </div>
     </div>
 
@@ -844,6 +831,26 @@
     <div class="step-panel" id="step-4-new">
       <div class="card-title">Your Contact Details</div>
       <div class="card-subtitle">We'll send your quote confirmation to this email address.</div>
+
+      <div class="field-group">
+        <label>Site Postcode</label>
+        <div style="padding:11px 14px;border:1.5px solid var(--border);border-radius:8px;background:rgba(245,242,235,0.7);color:var(--text);font-size:14px;" id="displayPostcode">—</div>
+        <div class="field-hint">Confirmed from your earlier entry.</div>
+      </div>
+
+      <div class="field-group">
+        <label>Site Address — Street <span class="required">*</span></label>
+        <input type="text" id="newSiteStreet" placeholder="e.g. 123 Oak Lane">
+        <div class="field-hint">The street address of the property where the trees are located.</div>
+        <div class="field-error" id="newSiteStreetError">Please enter the street address.</div>
+      </div>
+
+      <div class="field-group">
+        <label>Site Address — City/Town <span class="required">*</span></label>
+        <input type="text" id="newSiteCity" placeholder="e.g. London">
+        <div class="field-hint">The city or town where the property is located.</div>
+        <div class="field-error" id="newSiteCityError">Please enter the city or town.</div>
+      </div>
 
       <div class="field-group">
         <label>Full Name <span class="required">*</span></label>
@@ -916,6 +923,12 @@
         <p>Thank you — your enquiry has been submitted. Your reference number is:</p>
         <div class="ref-number" id="successRef">TH —</div>
         <p>We'll send a confirmation to <strong id="successEmail">your email</strong> shortly.</p>
+
+        <div style="background:rgba(74,140,92,0.12);border:1.5px solid var(--green-light);border-radius:12px;padding:20px;margin:24px 0;font-size:14px;line-height:1.6;color:#1a1a1a;">
+          <strong style="display:block;margin-bottom:8px;color:var(--green-dark);">📧 Important: Check Your Email</strong>
+          We'll be sending you an email with important information we need from you to carry out the job. Please look out for this email and reply with the requested details as soon as possible.
+        </div>
+
         <p style="margin-top:16px;">Questions? Call Trevor on <a href="tel:+447957763533" style="color:var(--green-mid);font-weight:500;">07957 763 533</a></p>
       </div>
     </div>
@@ -1039,10 +1052,7 @@ function updateQuotePreview() {
 
 function goToQuote() {
   const treeCount = document.getElementById('treeCount').value;
-  const street = document.getElementById('siteStreet').value.trim();
-  const city = document.getElementById('siteCity').value.trim();
   const postcode = document.getElementById('sitePostcode').value.trim();
-  const deadline = document.getElementById('deadline').value;
 
   let valid = true;
 
@@ -1050,23 +1060,16 @@ function goToQuote() {
     showError('treeCountError', 'treeCount'); valid = false;
   } else { hideError('treeCountError', 'treeCount'); }
 
-  if (!street) {
-    showError('siteStreetError', 'siteStreet'); valid = false;
-  } else { hideError('siteStreetError', 'siteStreet'); }
-
-  if (!city) {
-    showError('siteCityError', 'siteCity'); valid = false;
-  } else { hideError('siteCityError', 'siteCity'); }
-
   if (!postcode || postcode.length < 5) {
     showError('sitePostcodeError', 'sitePostcode'); valid = false;
   } else { hideError('sitePostcodeError', 'sitePostcode'); }
 
-  if (!deadline) {
-    showError('deadlineError', 'deadline'); valid = false;
-  } else { hideError('deadlineError', 'deadline'); }
-
   if (!valid) return;
+
+  // Reset deadline on entry to step-3
+  document.getElementById('deadline').value = '';
+  hideError('deadlineError', 'deadline');
+  document.getElementById('qSurchargeRow').style.display = 'none';
 
   // Build quote preview
   if (treeCount === '100+') {
@@ -1077,25 +1080,59 @@ function goToQuote() {
     document.getElementById('customQuote').style.display = 'none';
 
     const base = BASE_PRICES[treeCount];
-    const surcharge = SURCHARGES[deadline] || 0;
-    const total = base + surcharge;
-
     document.getElementById('qSurveyType').textContent = SURVEY_TYPE_LABELS[selectedSurveyType] || '—';
     document.getElementById('qTreeCount').textContent = treeCount + ' trees';
-    document.getElementById('qDeadline').textContent = DEADLINE_LABELS[deadline] || '—';
+    document.getElementById('qDeadline').textContent = '—';
     document.getElementById('qBasePrice').textContent = '£' + base;
-
-    if (surcharge > 0) {
-      document.getElementById('qSurchargeRow').style.display = 'flex';
-      document.getElementById('qSurcharge').textContent = '+£' + surcharge;
-    } else {
-      document.getElementById('qSurchargeRow').style.display = 'none';
-    }
-
-    document.getElementById('qTotal').textContent = '£' + total;
+    document.getElementById('qTotal').textContent = '£' + base;
   }
 
   goTo('step-3-new');
+}
+
+function updateDeadlineSurcharge() {
+  const treeCount = document.getElementById('treeCount').value;
+  const deadline = document.getElementById('deadline').value;
+
+  if (treeCount !== '100+') {
+    if (deadline) {
+      const base = BASE_PRICES[treeCount];
+      const surcharge = SURCHARGES[deadline] || 0;
+      const total = base + surcharge;
+
+      document.getElementById('qDeadline').textContent = DEADLINE_LABELS[deadline] || '—';
+
+      if (surcharge > 0) {
+        document.getElementById('qSurchargeRow').style.display = 'flex';
+        document.getElementById('qSurcharge').textContent = '+£' + surcharge;
+      } else {
+        document.getElementById('qSurchargeRow').style.display = 'none';
+      }
+
+      document.getElementById('qTotal').textContent = '£' + total;
+    } else {
+      document.getElementById('qDeadline').textContent = '—';
+      document.getElementById('qSurchargeRow').style.display = 'none';
+      document.getElementById('qTotal').textContent = '£' + BASE_PRICES[treeCount];
+    }
+  }
+}
+
+function proceedFromQuote() {
+  const deadline = document.getElementById('deadline').value;
+
+  if (!deadline) {
+    showError('deadlineError', 'deadline');
+    return;
+  }
+
+  hideError('deadlineError', 'deadline');
+
+  // Display postcode on Step 4
+  const postcode = document.getElementById('sitePostcode').value.trim().toUpperCase();
+  document.getElementById('displayPostcode').textContent = postcode || '—';
+
+  goTo('step-4-new');
 }
 
 // ============================================================
@@ -1127,10 +1164,16 @@ function goToAmendContact() {
 // SUBMISSIONS
 // ============================================================
 async function submitNewEnquiry() {
+  const street = document.getElementById('newSiteStreet').value.trim();
+  const city = document.getElementById('newSiteCity').value.trim();
   const name = document.getElementById('newName').value.trim();
   const email = document.getElementById('newEmail').value.trim();
 
   let valid = true;
+  if (!street) { showError('newSiteStreetError', 'newSiteStreet'); valid = false; }
+  else { hideError('newSiteStreetError', 'newSiteStreet'); }
+  if (!city) { showError('newSiteCityError', 'newSiteCity'); valid = false; }
+  else { hideError('newSiteCityError', 'newSiteCity'); }
   if (!name) { showError('newNameError', 'newName'); valid = false; }
   else { hideError('newNameError', 'newName'); }
   if (!email || !email.includes('@')) { showError('newEmailError', 'newEmail'); valid = false; }
@@ -1155,9 +1198,9 @@ async function submitNewEnquiry() {
     enquiry_type: 'new',
     survey_type: selectedSurveyType,
     tree_count_band: treeCount,
-    site_street: document.getElementById('siteStreet').value.trim(),
-    site_city: document.getElementById('siteCity').value.trim(),
     site_postcode: postcode,
+    site_street: street,
+    site_city: city,
     home_lat: coords?.lat || null,
     home_lng: coords?.lng || null,
     deadline_tier: deadlineTier,
@@ -1166,6 +1209,7 @@ async function submitNewEnquiry() {
     contact_phone: document.getElementById('newPhone').value.trim(),
     company: document.getElementById('newCompany').value.trim(),
     quoted_price,
+    status: quoted_price ? 'quoted' : 'new',
     submitted_at: new Date().toISOString()
   };
 
@@ -1241,15 +1285,92 @@ async function submitToSupabase(payload, email) {
 
     if (response.ok) {
       const data = await response.json();
-      const ref = data[0]?.job_number || 'TH —';
+      const enquiry = data[0];
+      const ref = enquiry?.job_number || 'TH —';
+
+      // Create job immediately (non-blocking)
+      createJobForEnquiry(enquiry, SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      // Auto-send quote email if price was computed
+      if (enquiry?.quoted_price) {
+        sendQuoteEmailAuto(enquiry, SUPABASE_URL, SUPABASE_ANON_KEY);
+      }
+
       showSuccess(ref, email);
     } else {
-      // FIXED
       alert('Submission failed. Please try again.');
     }
   } catch (err) {
-    // For demo/testing — show success
     alert('Submission failed. Please try again.');
+  }
+}
+
+async function createJobForEnquiry(enquiry, SUPABASE_URL, SUPABASE_ANON_KEY) {
+  try {
+    let jobData = {};
+
+    if (enquiry.enquiry_type === 'new') {
+      jobData = {
+        enquiry_id: enquiry.id,
+        job_type: 'new',
+        survey_type: enquiry.survey_type,
+        site_postcode: enquiry.site_postcode,
+        dispatch_state: 'pending_approval',
+        urgency_state: enquiry.deadline_tier === '1day' ? 'red' :
+                       enquiry.deadline_tier === '3days' ? 'orange' :
+                       enquiry.deadline_tier === '5days' ? 'yellow' : 'grey',
+        quoted_amount: enquiry.quoted_price,
+        agreed_amount: enquiry.quoted_price,
+        billing_contact_name: enquiry.contact_name,
+        billing_contact_email: enquiry.contact_email,
+        extended_info_received: false,
+      };
+    } else if (enquiry.enquiry_type === 'amendment') {
+      jobData = {
+        enquiry_id: enquiry.id,
+        job_type: 'amendment',
+        dispatch_state: 'pending_approval',
+        internal_notes: `Amendment request — customer-provided original job ref: "${enquiry.original_job_ref}". Scope: ${enquiry.amendment_scope}`,
+        extended_info_received: true,
+      };
+    }
+
+    await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify(jobData),
+    });
+  } catch (e) {
+    console.error('Auto job creation failed:', e);
+  }
+}
+
+async function sendQuoteEmailAuto(enquiry, SUPABASE_URL, SUPABASE_ANON_KEY) {
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/send-quote-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        enquiry_id: enquiry.id,
+        contact_email: enquiry.contact_email,
+        contact_name: enquiry.contact_name,
+        quoted_price: enquiry.quoted_price,
+        deadline_tier: enquiry.deadline_tier,
+        survey_type: enquiry.survey_type,
+        job_number: enquiry.job_number,
+        site_postcode: enquiry.site_postcode,
+      }),
+    });
+  } catch (e) {
+    console.error('Auto quote email failed:', e);
   }
 }
 

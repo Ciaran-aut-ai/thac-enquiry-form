@@ -716,6 +716,7 @@ function renderJob() {
         <div class="detail-sub">${getSurveyLabel(job.survey_type || job.job_type)}</div>
       </div>
       <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+        ${job.extended_info_received ? '<span class="badge badge-accepted">✅ Details Received</span>' : '<span class="badge badge-low">⏳ Awaiting Customer Details</span>'}
         ${getUrgencyBadge(job.urgency_state)}
         ${getDispatchBadge(job.dispatch_state)}
       </div>
@@ -908,6 +909,11 @@ function renderJob() {
             ${renderLinkedJobButton()}
             ${renderDispatchButton()}
             ${renderStage2Button()}
+            ${job.enquiry_id && enquiry?.contact_email ? `
+              <button class="btn btn-secondary w-100" style="justify-content:center;" onclick="sendQuoteEmailFromJob()">
+                📧 Resend Quote Email
+              </button>
+            ` : ''}
             ${renderInvoiceActions()}
           </div>
         </div>
@@ -2021,6 +2027,54 @@ async function createStage2Job() {
     }, 1000);
   } catch (e) {
     showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// SEND QUOTE EMAIL
+// ============================================================
+
+async function sendQuoteEmailFromJob() {
+  if (!job.enquiry_id || !enquiry?.contact_email) {
+    showToast('Missing customer email or enquiry reference', 'error');
+    return;
+  }
+
+  const btn = document.evaluate(`//button[contains(text(), 'Resend Quote Email')]`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+  if (btn) btn.disabled = true;
+
+  try {
+    const price = job.agreed_amount || job.quoted_amount || enquiry?.quoted_price;
+    if (!price) {
+      showToast('No price available to send in quote', 'error');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    const response = await fetch('/.netlify/functions/send-quote-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: enquiry.contact_email,
+        contact_name: enquiry.contact_name,
+        job_number: job.reference || enquiry.job_number || 'Quote',
+        quoted_price: price,
+        survey_type: enquiry.survey_type,
+        site_postcode: enquiry.site_postcode,
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `Email send failed (${response.status})`);
+    }
+
+    showToast('✅ Quote email sent to ' + enquiry.contact_email);
+    if (btn) btn.disabled = false;
+  } catch (err) {
+    console.error('Error sending quote email:', err);
+    showToast('Error sending email: ' + err.message, 'error');
+    if (btn) btn.disabled = false;
   }
 }
 

@@ -72,27 +72,13 @@ async function init() {
           </div>
         </div>
 
-        <!-- Two column layout -->
-        <div style="display:grid;grid-template-columns:1fr 380px;gap:20px;">
-
-          <!-- Urgency Dashboard -->
-          <div class="card">
-            <div class="card-title">
-              Active Jobs by Urgency
-              <a href="jobs.html" class="btn btn-secondary btn-sm">View All Jobs</a>
-            </div>
-            <div id="urgencyDashboard"><div class="loading"><div class="spinner"></div><br>Loading jobs...</div></div>
+        <!-- Urgency Dashboard -->
+        <div class="card">
+          <div class="card-title">
+            Active Jobs by Urgency
+            <a href="jobs.html" class="btn btn-secondary btn-sm">View All Jobs</a>
           </div>
-
-          <!-- Recent Enquiries -->
-          <div class="card">
-            <div class="card-title">
-              Recent Enquiries
-              <a href="enquiries.html" class="btn btn-secondary btn-sm">View All</a>
-            </div>
-            <div id="recentEnquiries"><div class="loading"><div class="spinner"></div><br>Loading...</div></div>
-          </div>
-
+          <div id="urgencyDashboard"><div class="loading"><div class="spinner"></div><br>Loading jobs...</div></div>
         </div>
       </div>
     </div>
@@ -101,9 +87,7 @@ async function init() {
   await Promise.all([
     loadStats(),
     loadRevenue(),
-    loadUrgencyDashboard(),
-    loadRecentEnquiries(),
-    loadEnquiryBadge()
+    loadUrgencyDashboard()
   ]);
 }
 
@@ -284,39 +268,6 @@ async function loadUrgencyDashboard() {
 }
 
 // ============================================================
-// RECENT ENQUIRIES
-// ============================================================
-async function loadRecentEnquiries() {
-  try {
-    const enquiries = await dbGet('enquiries', {
-      'select': 'id,job_number,contact_name,survey_type,status,submitted_at',
-      'order': 'submitted_at.desc',
-      'limit': 8
-    });
-
-    if (!enquiries || enquiries.length === 0) {
-      document.getElementById('recentEnquiries').innerHTML = `<div class="empty-state"><p>No enquiries yet</p></div>`;
-      return;
-    }
-
-    const items = enquiries.map(e => `
-      <div onclick="window.location.href='enquiry-detail.html?id=${e.id}'" style="padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;" class="hover-row">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-          <span class="ref" style="font-size:12px;">${e.job_number || 'Pending'}</span>
-          ${statusBadge(e.status)}
-        </div>
-        <div style="font-size:13px;font-weight:500;color:var(--text);">${e.contact_name || '—'}</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${getSurveyLabel(e.survey_type)} · ${timeAgo(e.submitted_at)}</div>
-      </div>
-    `).join('');
-
-    document.getElementById('recentEnquiries').innerHTML = `<div>${items}</div>`;
-  } catch (e) {
-    document.getElementById('recentEnquiries').innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
-  }
-}
-
-// ============================================================
 // GLOBAL SEARCH
 // ============================================================
 
@@ -334,15 +285,10 @@ function handleGlobalSearch(q) {
 async function runGlobalSearch(q) {
   const box = document.getElementById('searchResults');
   try {
-    const [jobs, enquiries, clients] = await Promise.all([
+    const [jobs, clients] = await Promise.all([
       dbGet('jobs', {
         'select': 'id,reference,survey_type,site_postcode,dispatch_state',
         'or': `reference.ilike.*${q}*,site_postcode.ilike.*${q}*`,
-        'limit': 5
-      }),
-      dbGet('enquiries', {
-        'select': 'id,job_number,contact_name,survey_type,status',
-        'or': `job_number.ilike.*${q}*,contact_name.ilike.*${q}*,contact_email.ilike.*${q}*`,
         'limit': 5
       }),
       dbGet('clients', {
@@ -362,19 +308,6 @@ async function runGlobalSearch(q) {
           <div>
             <div style="font-weight:600;font-size:13px;">${j.reference || '—'}</div>
             <div style="font-size:12px;color:var(--text-muted);">${getSurveyLabel(j.survey_type)} · ${j.site_postcode || '—'}</div>
-          </div>
-        </a>`);
-      });
-    }
-
-    if (enquiries?.length) {
-      sections.push(`<div style="padding:8px 16px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-top:1px solid var(--border);">Enquiries</div>`);
-      enquiries.forEach(e => {
-        sections.push(`<a href="enquiry-detail.html?id=${e.id}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;text-decoration:none;color:var(--text);" class="hover-row">
-          <span style="font-size:16px;">📥</span>
-          <div>
-            <div style="font-weight:600;font-size:13px;">${e.contact_name || e.job_number || '—'}</div>
-            <div style="font-size:12px;color:var(--text-muted);">${e.job_number || 'Pending'} · ${getSurveyLabel(e.survey_type)}</div>
           </div>
         </a>`);
       });

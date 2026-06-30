@@ -448,59 +448,92 @@ async function submitStep2(enquiryId, ref) {
     await supabasePatch('enquiries', `id=eq.${enquiryId}`, updateData);
     console.log('✅ Enquiries PATCH completed');
 
-    // Auto-create job from accepted quote
+    // Update the job that was created at enquiry submission time
     try {
-      const jobData = {
-        enquiry_id: enquiryId,
-        survey_type: currentEnquiry?.survey_type,
-        site_postcode: currentEnquiry?.site_postcode,
-        dispatch_state: 'pending_approval',
-        urgency_state: currentEnquiry?.deadline_tier === '1day' ? 'red' :
-                       currentEnquiry?.deadline_tier === '3days' ? 'orange' :
-                       currentEnquiry?.deadline_tier === '5days' ? 'yellow' : 'grey',
-        quoted_amount: currentEnquiry?.quoted_price,
-        agreed_amount: currentEnquiry?.quoted_price,
-        site_access_notes: document.getElementById('accessDetails').value.trim() || null,
-        billing_contact_name: document.getElementById('billName').value.trim() || null,
-        billing_contact_email: document.getElementById('billEmail').value.trim() || null,
-        billing_address: billAddress,
-        report_addressee_name: finalReportName,
-        report_addressee_address: finalReportAddress,
-        report_title: document.getElementById('reportTitle').value.trim() || null,
-        parking_lat: parkingLat,
-        parking_lng: parkingLng,
-      };
-
-      console.log('📤 Creating job with parking_lat:', jobData.parking_lat, 'parking_lng:', jobData.parking_lng);
-      console.log('📤 Full job data:', jobData);
-
-      const jobResp = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
-        method: 'POST',
+      const jobResp = await fetch(`${SUPABASE_URL}/rest/v1/jobs?enquiry_id=eq.${enquiryId}&select=id&limit=1`, {
+        method: 'GET',
         headers: {
           'apikey': SUPABASE_KEY,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
-        },
-        body: JSON.stringify(jobData)
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
       });
 
-      const jobRespText = await jobResp.text();
-      console.log('Job response status:', jobResp.status);
-      console.log('Job response:', jobRespText);
+      if (jobResp.ok) {
+        const jobs = await jobResp.json();
+        if (jobs && jobs.length > 0) {
+          const jobId = jobs[0].id;
+          const jobUpdateData = {
+            site_access_notes: document.getElementById('accessDetails').value.trim() || null,
+            billing_contact_name: document.getElementById('billName').value.trim() || null,
+            billing_contact_email: document.getElementById('billEmail').value.trim() || null,
+            billing_address: billAddress,
+            report_addressee_name: finalReportName,
+            report_addressee_address: finalReportAddress,
+            report_title: document.getElementById('reportTitle').value.trim() || null,
+            parking_lat: parkingLat,
+            parking_lng: parkingLng,
+            extended_info_received: true,
+            extended_info_received_at: new Date().toISOString(),
+          };
 
-      if (!jobResp.ok) {
-        console.error('❌ Job creation failed with status', jobResp.status);
-        console.error('Error details:', jobRespText);
-      } else {
-        try {
-          const createdJob = JSON.parse(jobRespText);
-          console.log('✅ Job created successfully:', createdJob[0]?.id);
-        } catch (e) {
-          console.log('✅ Job created (could not parse response)');
+          console.log('📤 Updating job', jobId, 'with parking_lat:', jobUpdateData.parking_lat, 'parking_lng:', jobUpdateData.parking_lng);
+
+          const updateJobResp = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${jobId}`, {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(jobUpdateData)
+          });
+
+          if (updateJobResp.ok) {
+            console.log('✅ Job updated successfully');
+          } else {
+            console.error('❌ Job update failed:', updateJobResp.status);
+          }
+        } else {
+          console.log('⚠️ No job found for enquiry, falling back to create');
+          // Defensive fallback: create job if not found
+          const jobData = {
+            enquiry_id: enquiryId,
+            survey_type: currentEnquiry?.survey_type,
+            site_postcode: currentEnquiry?.site_postcode,
+            dispatch_state: 'pending_approval',
+            urgency_state: currentEnquiry?.deadline_tier === '1day' ? 'red' :
+                           currentEnquiry?.deadline_tier === '3days' ? 'orange' :
+                           currentEnquiry?.deadline_tier === '5days' ? 'yellow' : 'grey',
+            quoted_amount: currentEnquiry?.quoted_price,
+            agreed_amount: currentEnquiry?.quoted_price,
+            site_access_notes: document.getElementById('accessDetails').value.trim() || null,
+            billing_contact_name: document.getElementById('billName').value.trim() || null,
+            billing_contact_email: document.getElementById('billEmail').value.trim() || null,
+            billing_address: billAddress,
+            report_addressee_name: finalReportName,
+            report_addressee_address: finalReportAddress,
+            report_title: document.getElementById('reportTitle').value.trim() || null,
+            parking_lat: parkingLat,
+            parking_lng: parkingLng,
+          };
+
+          const createJobResp = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(jobData)
+          });
+
+          if (createJobResp.ok) {
+            console.log('✅ Job created as fallback');
+          }
         }
       }
     } catch (jobErr) {
-      console.error('Error creating job:', jobErr.message);
+      console.error('Error updating/creating job:', jobErr.message);
     }
 
     showDone('🎉', 'All Done!',
@@ -529,6 +562,31 @@ async function declineQuote(enquiryId) {
       declined_reason: reason,
       declined_at:     new Date().toISOString(),
     });
+
+    // Archive the linked job
+    try {
+      const jobResp = await fetch(`${SUPABASE_URL}/rest/v1/jobs?enquiry_id=eq.${enquiryId}&select=id&limit=1`, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+
+      if (jobResp.ok) {
+        const jobs = await jobResp.json();
+        if (jobs && jobs.length > 0) {
+          const jobId = jobs[0].id;
+          await supabasePatch('jobs', `id=eq.${jobId}`, {
+            dispatch_state: 'archived'
+          });
+          console.log('✅ Linked job archived');
+        }
+      }
+    } catch (jobErr) {
+      console.error('Error archiving job:', jobErr.message);
+    }
+
     document.getElementById('card').innerHTML = `
       <div class="logo">🌳</div>
       <div class="brand">Trevor Heaps Arboricultural Consultancy Ltd.</div>

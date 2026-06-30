@@ -194,10 +194,6 @@ function renderSidebar(activePage) {
         <a href="dashboard.html" class="nav-item ${activePage === 'dashboard' ? 'active' : ''}" data-page="dashboard">
           <span class="nav-icon">📊</span> Dashboard
         </a>
-        <a href="enquiries.html" class="nav-item ${activePage === 'enquiries' ? 'active' : ''}" data-page="enquiries">
-          <span class="nav-icon">📥</span> Enquiries
-          <span class="nav-badge" id="enquiry-count">—</span>
-        </a>
         <a href="jobs.html" class="nav-item ${activePage === 'jobs' ? 'active' : ''}" data-page="jobs">
           <span class="nav-icon">💼</span> Jobs
         </a>
@@ -237,16 +233,4 @@ function toggleSidebar() {
 function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('active');
-}
-
-// Load new enquiry count into sidebar badge
-async function loadEnquiryBadge() {
-  try {
-    const data = await dbGet('enquiries', { 'status': 'eq.new', 'select': 'id' });
-    const badge = document.getElementById('enquiry-count');
-    if (badge && data) {
-      badge.textContent = data.length || '0';
-      if (!data.length) badge.style.display = 'none';
-    }
-  } catch (e) { /* silent */ }
 }
