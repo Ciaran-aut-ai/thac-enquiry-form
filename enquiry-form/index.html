@@ -586,30 +586,8 @@
     Not sure? Call Trevor on <a href="tel:+447957763533" class="phone-link">07957 763 533</a></p>
   </div>
 
-  <!-- STEP GATE: Postcode area check (shown before progress bar) -->
-  <div class="form-card" id="step-gate">
-    <div class="card-title">Where's the property located?</div>
-    <div class="card-subtitle">Enter the postcode and we'll confirm we cover your area.</div>
-
-    <div class="field-group">
-      <label>Postcode <span class="required">*</span></label>
-      <input type="text" id="gatePostcode" placeholder="e.g. SW1A 1AA" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
-      <div class="field-hint">We'll check this against our service area.</div>
-      <div class="field-error" id="gatePostcodeError">Please enter a valid postcode.</div>
-    </div>
-
-    <div class="field-error" id="gateOutOfAreaError" style="display:none;">
-      Sorry, we don't currently operate in this area.<br>
-      Please call Trevor on <a href="tel:+447957763533" class="phone-link">07957 763 533</a> to discuss your options.
-    </div>
-
-    <div class="form-nav">
-      <button class="btn btn-primary" onclick="checkPostcodeArea()" id="gateCheckBtn">Check Postcode →</button>
-    </div>
-  </div>
-
   <!-- Progress -->
-  <div class="progress-bar" id="progressBar" style="display:none;">
+  <div class="progress-bar" id="progressBar">
     <div class="progress-step active" data-step="1">
       <div class="step-dot">1</div>
       <span class="step-label">Type</span>
@@ -629,7 +607,7 @@
   </div>
 
   <!-- Form Card -->
-  <div class="form-card" id="mainFormCard" style="display:none;">
+  <div class="form-card" id="mainFormCard">
 
     <!-- STEP 0: New or Existing -->
     <div class="step-panel active" id="step-0">
@@ -651,6 +629,28 @@
         <button class="btn btn-primary" onclick="proceedFromBranch()" id="branchNextBtn" disabled style="opacity:0.4;">
           Continue →
         </button>
+      </div>
+    </div>
+
+    <!-- STEP 0-GATE: Postcode check for New Survey -->
+    <div class="step-panel" id="step-0-gate-new">
+      <div class="card-title">Where's the property located?</div>
+      <div class="card-subtitle">Enter the postcode and we'll confirm we cover your area.</div>
+
+      <div class="field-group">
+        <label>Postcode <span class="required">*</span></label>
+        <input type="text" id="gatePostcode" placeholder="e.g. SW1A 1AA" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+        <div class="field-hint">We'll check this against our service area.</div>
+        <div class="field-error" id="gatePostcodeError">Please enter a valid postcode.</div>
+      </div>
+
+      <div class="field-error" id="gateOutOfAreaError" style="display:none;">
+        Sorry, we don't currently operate in this area.<br>
+        Please call Trevor on <a href="tel:+447957763533" class="phone-link">07957 763 533</a> to discuss your options.
+      </div>
+
+      <div class="form-nav">
+        <button class="btn btn-primary" onclick="checkPostcodeArea()" id="gateCheckBtn">Check Postcode →</button>
       </div>
     </div>
 
@@ -1057,18 +1057,15 @@ function checkPostcodeArea() {
   }
 
   validatedPostcode = raw;
-  document.getElementById('step-gate').style.display = 'none';
-  document.getElementById('progressBar').style.display = '';
-  document.getElementById('mainFormCard').style.display = '';
 
-  // Pre-fill + lock the postcode field for later (New Survey branch)
+  // Pre-fill + lock the postcode field for later (step-2-new)
   const siteField = document.getElementById('sitePostcode');
   if (siteField) {
     siteField.value = validatedPostcode;
     siteField.readOnly = true;
   }
 
-  goTo('step-0');
+  goTo('step-1-new');
 }
 
 // ============================================================
@@ -1115,7 +1112,7 @@ function selectBranch(type, card) {
 
 function proceedFromBranch() {
   if (!branch) return;
-  if (branch === 'new') goTo('step-1-new');
+  if (branch === 'new') goTo('step-0-gate-new');
   else goTo('step-1-amendment');
 }
 
